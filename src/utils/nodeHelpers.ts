@@ -109,7 +109,7 @@ export function getSiblingInstances(
  */
 export function calculateSiblingPosition(
 	currentInstance: NodeInstance,
-	_siblings: NodeInstance[]
+	siblings: NodeInstance[]
 ): { x: number; y: number } {
 	// Position below the current node (same x, different y)
 	const verticalSpacing = 100;
@@ -144,4 +144,111 @@ export function calculateChildPosition(
 		x: lastChild.position.x,
 		y: lastChild.position.y + verticalSpacing,
 	};
+}
+
+/**
+ * Get the parent instance of a given instance
+ */
+export function getParentInstance(
+	instanceId: string,
+	instances: NodeInstance[]
+): NodeInstance | null {
+	const instance = instances.find((inst) => inst.instanceId === instanceId);
+	if (!instance || !instance.parentInstanceId) return null;
+
+	return (
+		instances.find((inst) => inst.instanceId === instance.parentInstanceId) ||
+		null
+	);
+}
+
+/**
+ * Get the first child instance of a given instance
+ */
+export function getFirstChildInstance(
+	instanceId: string,
+	instances: NodeInstance[]
+): NodeInstance | null {
+	const children = getChildrenInstances(instanceId, instances);
+	if (children.length === 0) return null;
+
+	// Sort by sibling order and return the first one
+	return children.sort((a, b) => a.siblingOrder - b.siblingOrder)[0];
+}
+
+/**
+ * Get the next sibling instance (same parent, higher sibling order)
+ */
+export function getNextSiblingInstance(
+	instanceId: string,
+	instances: NodeInstance[]
+): NodeInstance | null {
+	const instance = instances.find((inst) => inst.instanceId === instanceId);
+	if (!instance) return null;
+
+	const siblings = getSiblingInstances(instanceId, instances);
+	if (siblings.length === 0) return null;
+
+	// Sort by sibling order and find the next one
+	const sortedSiblings = siblings.sort(
+		(a, b) => a.siblingOrder - b.siblingOrder
+	);
+	const nextSibling = sortedSiblings.find(
+		(sibling) => sibling.siblingOrder > instance.siblingOrder
+	);
+
+	return nextSibling || null;
+}
+
+/**
+ * Get the previous sibling instance (same parent, lower sibling order)
+ */
+export function getPreviousSiblingInstance(
+	instanceId: string,
+	instances: NodeInstance[]
+): NodeInstance | null {
+	const instance = instances.find((inst) => inst.instanceId === instanceId);
+	if (!instance) return null;
+
+	const siblings = getSiblingInstances(instanceId, instances);
+	if (siblings.length === 0) return null;
+
+	// Sort by sibling order and find the previous one
+	const sortedSiblings = siblings.sort(
+		(a, b) => a.siblingOrder - b.siblingOrder
+	);
+	const previousSibling = sortedSiblings
+		.reverse()
+		.find((sibling) => sibling.siblingOrder < instance.siblingOrder);
+
+	return previousSibling || null;
+}
+
+/**
+ * Update positions of siblings that come after the current instance
+ * This pushes them down when a new sibling is inserted
+ */
+export function updateSiblingPositions(
+	currentInstance: NodeInstance,
+	instances: NodeInstance[]
+): NodeInstance[] {
+	const verticalSpacing = 100;
+
+	return instances.map((instance) => {
+		// Only update siblings of the same parent that come after the current instance
+		if (
+			instance.parentInstanceId === currentInstance.parentInstanceId &&
+			instance.siblingOrder > currentInstance.siblingOrder &&
+			instance.instanceId !== currentInstance.instanceId
+		) {
+			return {
+				...instance,
+				position: {
+					...instance.position,
+					y: instance.position.y + verticalSpacing,
+				},
+			};
+		}
+		return instance;
+	});
 }

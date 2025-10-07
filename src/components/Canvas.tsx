@@ -25,6 +25,11 @@ import {
 	calculateSiblingPosition,
 	calculateChildPosition,
 	getAllDescendants,
+	getParentInstance,
+	getFirstChildInstance,
+	getNextSiblingInstance,
+	getPreviousSiblingInstance,
+	updateSiblingPositions,
 } from "../utils/nodeHelpers";
 import { applyBalancedLayout } from "../utils/layoutHelpers";
 import MindNode, { MindNodeData } from "./MindNode";
@@ -144,28 +149,33 @@ export default function Canvas({ graph, onGraphChange }: CanvasProps) {
 
 	// Convert graph data to React Flow format
 	const syncGraphToFlow = useCallback(() => {
-		const flowNodes: Node<MindNodeData>[] = graph.instances.map((instance) => {
-			const treeNode = graph.nodes[instance.nodeId];
-			const isFocused = instance.instanceId === graph.focusedInstanceId;
-			const isEditing = instance.instanceId === editingInstanceId;
-			const isRoot = instance.parentInstanceId === null;
+		const flowNodes: Node<MindNodeData>[] = graph.instances
+			.filter((instance) => {
+				// Only include instances that have a valid node
+				return graph.nodes[instance.nodeId] !== undefined;
+			})
+			.map((instance) => {
+				const treeNode = graph.nodes[instance.nodeId];
+				const isFocused = instance.instanceId === graph.focusedInstanceId;
+				const isEditing = instance.instanceId === editingInstanceId;
+				const isRoot = instance.parentInstanceId === null;
 
-			return {
-				id: instance.instanceId,
-				type: "mindNode",
-				position: instance.position,
-				data: {
-					node: treeNode,
-					isEditing,
-					isRoot,
-					onStartEdit: () => handleStartEdit(instance.instanceId),
-					onFinishEdit: handleFinishEdit,
-					onCancelEdit: handleCancelEdit,
-				},
-				selected: isFocused,
-				draggable: true,
-			};
-		});
+				return {
+					id: instance.instanceId,
+					type: "mindNode",
+					position: instance.position,
+					data: {
+						node: treeNode,
+						isEditing,
+						isRoot,
+						onStartEdit: () => handleStartEdit(instance.instanceId),
+						onFinishEdit: handleFinishEdit,
+						onCancelEdit: handleCancelEdit,
+					},
+					selected: isFocused,
+					draggable: true,
+				};
+			});
 
 		const flowEdges: Edge[] = graph.edges.map((edge) => ({
 			id: edge.id,
@@ -276,8 +286,17 @@ export default function Canvas({ graph, onGraphChange }: CanvasProps) {
 			position,
 			currentInstance.parentInstanceId,
 			currentInstance.depth,
-			siblings.length
+			currentInstance.siblingOrder + 1 // Insert right after current instance
 		);
+
+		// Update positions of siblings that come after the current one
+		const updatedInstances = updateSiblingPositions(
+			currentInstance,
+			graph.instances
+		);
+
+		// Add the new instance
+		const finalInstances = [...updatedInstances, newInstance];
 
 		// Create edge from parent to new sibling
 		const newEdges = [...graph.edges];
@@ -290,7 +309,7 @@ export default function Canvas({ graph, onGraphChange }: CanvasProps) {
 		const updatedGraph: MindGraph = {
 			...graph,
 			nodes: { ...graph.nodes, [newNode.nodeId]: newNode },
-			instances: [...graph.instances, newInstance],
+			instances: finalInstances,
 			edges: newEdges,
 			rootNodeId: graph.rootNodeId || newNode.nodeId,
 			focusedInstanceId: newInstance.instanceId,
@@ -364,6 +383,71 @@ export default function Canvas({ graph, onGraphChange }: CanvasProps) {
 		});
 	}, [graph, onGraphChange]);
 
+	// Arrow key navigation handlers - only move if valid target exists
+	const handleNavigateLeft = useCallback(() => {
+		if (!graph.focusedInstanceId) return;
+
+		const parentInstance = getParentInstance(
+			graph.focusedInstanceId,
+			graph.instances
+		);
+		// Only move if parent exists - otherwise focus stays where it is
+		if (parentInstance) {
+			onGraphChange({
+				...graph,
+				focusedInstanceId: parentInstance.instanceId,
+			});
+		}
+	}, [graph, onGraphChange]);
+
+	const handleNavigateRight = useCallback(() => {
+		if (!graph.focusedInstanceId) return;
+
+		const firstChild = getFirstChildInstance(
+			graph.focusedInstanceId,
+			graph.instances
+		);
+		// Only move if child exists - otherwise focus stays where it is
+		if (firstChild) {
+			onGraphChange({
+				...graph,
+				focusedInstanceId: firstChild.instanceId,
+			});
+		}
+	}, [graph, onGraphChange]);
+
+	const handleNavigateDown = useCallback(() => {
+		if (!graph.focusedInstanceId) return;
+
+		const nextSibling = getNextSiblingInstance(
+			graph.focusedInstanceId,
+			graph.instances
+		);
+		// Only move if next sibling exists - otherwise focus stays where it is
+		if (nextSibling) {
+			onGraphChange({
+				...graph,
+				focusedInstanceId: nextSibling.instanceId,
+			});
+		}
+	}, [graph, onGraphChange]);
+
+	const handleNavigateUp = useCallback(() => {
+		if (!graph.focusedInstanceId) return;
+
+		const previousSibling = getPreviousSiblingInstance(
+			graph.focusedInstanceId,
+			graph.instances
+		);
+		// Only move if previous sibling exists - otherwise focus stays where it is
+		if (previousSibling) {
+			onGraphChange({
+				...graph,
+				focusedInstanceId: previousSibling.instanceId,
+			});
+		}
+	}, [graph, onGraphChange]);
+
 	// Delete selected nodes and their subtrees
 	const handleDeleteNodes = useCallback(() => {
 		// Get selected nodes from React Flow
@@ -404,7 +488,7 @@ export default function Canvas({ graph, onGraphChange }: CanvasProps) {
 		});
 
 		// Update graph
-		onGraphChange({
+		const updatedGraph = {
 			...graph,
 			nodes: remainingNodes,
 			instances: remainingInstances,
@@ -414,7 +498,9 @@ export default function Canvas({ graph, onGraphChange }: CanvasProps) {
 				instancesToDelete.has(graph.focusedInstanceId)
 					? null
 					: graph.focusedInstanceId,
-		});
+		};
+
+		onGraphChange(updatedGraph);
 
 		// Clear editing state if deleted node was being edited
 		if (editingInstanceId && instancesToDelete.has(editingInstanceId)) {
@@ -422,9 +508,9 @@ export default function Canvas({ graph, onGraphChange }: CanvasProps) {
 		}
 	}, [nodes, graph, onGraphChange, editingInstanceId]);
 
-	// Keyboard shortcuts
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
+	// Handle keyboard events through React Flow's onKeyDown
+	const handleKeyDown = useCallback(
+		(e: React.KeyboardEvent) => {
 			// Ignore if typing in input/textarea
 			if (
 				editingInstanceId ||
@@ -434,39 +520,74 @@ export default function Canvas({ graph, onGraphChange }: CanvasProps) {
 				return;
 			}
 
+			// Delete selected nodes: Delete or Backspace (handle this first, regardless of focus)
+			if (e.key === "Delete" || e.key === "Backspace") {
+				e.preventDefault();
+				handleDeleteNodes();
+				return;
+			}
+
+			// Arrow key navigation - only handle if we have a focused node
+			if (graph.focusedInstanceId) {
+				if (e.key === "ArrowLeft") {
+					e.preventDefault();
+					e.stopPropagation();
+					handleNavigateLeft();
+				} else if (e.key === "ArrowRight") {
+					e.preventDefault();
+					e.stopPropagation();
+					handleNavigateRight();
+				} else if (e.key === "ArrowDown") {
+					e.preventDefault();
+					e.stopPropagation();
+					handleNavigateDown();
+				} else if (e.key === "ArrowUp") {
+					e.preventDefault();
+					e.stopPropagation();
+					handleNavigateUp();
+				} else if (e.key === "Enter") {
+					e.preventDefault();
+					e.stopPropagation();
+					// Create sibling when node is focused
+					handleCreateSibling();
+				} else if (e.key === "Tab") {
+					e.preventDefault();
+					e.stopPropagation();
+					// Create child when node is focused
+					handleCreateChild();
+				}
+			}
 			// Create new node: Cmd/Ctrl + N
-			if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+			else if ((e.metaKey || e.ctrlKey) && e.key === "n") {
 				e.preventDefault();
 				handleCreateNode();
 			}
-			// Create sibling: Enter
+			// Create sibling: Enter (when no node is focused)
 			else if (e.key === "Enter") {
 				e.preventDefault();
 				handleCreateSibling();
 			}
-			// Create child: Tab
+			// Create child: Tab (when no node is focused)
 			else if (e.key === "Tab") {
 				e.preventDefault();
 				handleCreateChild();
 			}
-			// Delete selected nodes: Delete or Backspace
-			else if (e.key === "Delete" || e.key === "Backspace") {
-				e.preventDefault();
-				handleDeleteNodes();
-			}
 			// Note: Space is now used for panning (Space + drag)
 			// Edit via double-click only to prevent conflicts
-		};
-
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [
-		handleCreateNode,
-		handleCreateSibling,
-		handleCreateChild,
-		handleDeleteNodes,
-		editingInstanceId,
-	]);
+		},
+		[
+			graph,
+			handleNavigateLeft,
+			handleNavigateRight,
+			handleNavigateDown,
+			handleNavigateUp,
+			handleCreateNode,
+			handleCreateSibling,
+			handleCreateChild,
+			handleDeleteNodes,
+			editingInstanceId,
+		]
+	);
 
 	return (
 		<div className="canvas-container">
@@ -477,6 +598,7 @@ export default function Canvas({ graph, onGraphChange }: CanvasProps) {
 				onEdgesChange={onEdgesChange}
 				onConnect={onConnect}
 				onNodeClick={handleNodeClick}
+				onKeyDown={handleKeyDown}
 				nodeTypes={nodeTypes}
 				fitView
 				minZoom={0.1}
@@ -491,6 +613,8 @@ export default function Canvas({ graph, onGraphChange }: CanvasProps) {
 				panActivationKeyCode="Space"
 				multiSelectionKeyCode="Shift"
 				selectionMode={SelectionMode.Partial}
+				nodesDraggable={true}
+				elementsSelectable={true}
 			>
 				<Background variant={BackgroundVariant.Dots} gap={16} size={1} />
 				<Controls />
@@ -514,6 +638,18 @@ export default function Canvas({ graph, onGraphChange }: CanvasProps) {
 						<span>{graph.instances.length} instances</span>
 					</div>
 					<div className="keyboard-hints">
+						<div className="hint">
+							<kbd>←</kbd> → Parent
+						</div>
+						<div className="hint">
+							<kbd>→</kbd> → Child
+						</div>
+						<div className="hint">
+							<kbd>↑</kbd> → Prev Sibling
+						</div>
+						<div className="hint">
+							<kbd>↓</kbd> → Next Sibling
+						</div>
 						<div className="hint">
 							<kbd>Enter</kbd> → Sibling
 						</div>

@@ -4,29 +4,10 @@ import { MindGraph } from "./types";
 import { loadGraph, saveGraph, createEmptyGraph } from "./utils/storage";
 import "./App.css";
 
-// Migrate old graph data to new format
-function migrateGraph(graph: MindGraph): MindGraph {
-	const migratedInstances = graph.instances.map((instance, index) => ({
-		...instance,
-		parentInstanceId: instance.parentInstanceId ?? null,
-		depth: instance.depth ?? 0,
-		siblingOrder: (instance as any).siblingOrder ?? index,
-	}));
-
-	return {
-		...graph,
-		instances: migratedInstances,
-		focusedInstanceId: graph.focusedInstanceId ?? null,
-	};
-}
-
 function App() {
 	const [graph, setGraph] = useState<MindGraph>(() => {
 		const loadedGraph = loadGraph();
-		if (loadedGraph) {
-			return migrateGraph(loadedGraph);
-		}
-		return createEmptyGraph();
+		return loadedGraph || createEmptyGraph();
 	});
 
 	// Auto-save to localStorage
@@ -42,7 +23,9 @@ function App() {
 		<div className="app">
 			<header className="app-header">
 				<h1>MindGraph</h1>
-				<p className="subtitle">Build, study, and evolve your knowledge tree</p>
+				<p className="subtitle">
+					Build, study, and evolve your knowledge graph
+				</p>
 			</header>
 
 			<Canvas graph={graph} onGraphChange={handleGraphChange} />
