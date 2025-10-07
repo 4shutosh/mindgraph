@@ -1,0 +1,269 @@
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+		"Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+		sans-serif;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+.app {
+	width: 100vw;
+	height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background: #f8f9fa;
+}
+
+.app-header {
+	padding: 1rem 1.5rem;
+	background: white;
+	border-bottom: 1px solid #e1e4e8;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.app-header h1 {
+	font-size: 1.5rem;
+	font-weight: 600;
+	color: #24292e;
+	margin-bottom: 0.25rem;
+}
+
+.subtitle {
+	font-size: 0.875rem;
+	color: #586069;
+}
+
+.canvas-container {
+	flex: 1;
+	position: relative;
+}
+
+/* Custom Node Styles */
+.mind-node {
+	transition: all 0.2s ease;
+	cursor: pointer;
+}
+
+/* Root nodes have white box with border */
+.mind-node.root-node {
+	background: white;
+	border: 2px solid #d1d5db;
+	border-radius: 8px;
+	padding: 12px;
+	min-width: 60px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.mind-node.root-node:hover {
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	border-color: #9ca3af;
+}
+
+/* Child nodes are just text - no border or background */
+.mind-node.child-node {
+	background: transparent;
+	border: 2px solid transparent;
+	border-radius: 8px;
+	padding: 4px;
+}
+
+.mind-node.child-node:hover {
+	background: rgba(0, 0, 0, 0.02);
+}
+
+/* Selected state shows border for all nodes */
+.mind-node.selected {
+	border-color: #3b82f6 !important;
+	background: white;
+	box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+}
+
+.node-title {
+	font-size: 0.95rem;
+	font-weight: 500;
+	color: #1f2937;
+	word-wrap: break-word;
+	min-height: 1.5rem;
+	cursor: text;
+	padding: 0;
+	margin: 0;
+	display: inline-block;
+}
+
+.node-title-input {
+	width: auto;
+	min-width: 2ch;
+	max-width: 100%;
+	font-size: 0.95rem;
+	font-weight: 500;
+	color: #1f2937;
+	border: none;
+	border-radius: 0;
+	padding: 0;
+	margin: 0;
+	outline: none;
+	background: transparent;
+	font-family: inherit;
+	display: inline-block;
+}
+
+/* Override parent container width when editing */
+.mind-node.editing {
+	min-width: auto !important;
+	width: auto !important;
+}
+
+.mind-node.root-node.editing {
+	min-width: auto !important;
+	width: auto !important;
+}
+
+/* Control Panel */
+.control-panel {
+	background: white;
+	border-radius: 8px;
+	padding: 12px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.stats {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	font-size: 0.75rem;
+	color: #6b7280;
+}
+
+.keyboard-hints {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-top: 8px;
+	padding-top: 8px;
+	border-top: 1px solid #e5e7eb;
+}
+
+.hint {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 0.7rem;
+	color: #6b7280;
+	line-height: 1.3;
+}
+
+kbd {
+	background: #f3f4f6;
+	border: 1px solid #d1d5db;
+	border-radius: 4px;
+	padding: 2px 6px;
+	font-family: "Courier New", monospace;
+	font-size: 0.7rem;
+	font-weight: 600;
+	color: #374151;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Buttons */
+.btn {
+	padding: 8px 16px;
+	border: none;
+	border-radius: 6px;
+	font-size: 0.875rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.btn-primary {
+	background: #3b82f6;
+	color: white;
+}
+
+.btn-primary:hover {
+	background: #2563eb;
+}
+
+.btn-secondary {
+	background: #e5e7eb;
+	color: #374151;
+}
+
+.btn-secondary:hover {
+	background: #d1d5db;
+}
+
+/* React Flow Customization */
+.react-flow__node {
+	cursor: grab;
+}
+
+.react-flow__node:active {
+	cursor: grabbing;
+}
+
+/* Handles are now invisible and centered */
+.react-flow__handle {
+	width: 8px;
+	height: 8px;
+	background: transparent;
+	border: none;
+}
+
+.react-flow__edge-path {
+	stroke: #9ca3af;
+	stroke-width: 2.5;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+	stroke: #3b82f6;
+	stroke-width: 3;
+}
+
+/* Hide connection line preview when dragging (since manual connections are disabled) */
+.react-flow__connectionline {
+	display: none;
+}
+
+/* Bezier edge styling - smooth curves */
+.react-flow__edge {
+	cursor: default;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+	stroke: #6b7280;
+	stroke-width: 3;
+}
+
+.react-flow__minimap {
+	background: #f9fafb;
+}
+
+.react-flow__controls {
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.react-flow__background {
+	background: #ffffff;
+}
+
+/* Selection box styling */
+.react-flow__selection {
+	background: rgba(59, 130, 246, 0.1);
+	border: 2px dashed #3b82f6;
+}
+
+/* Selected nodes styling */
+.react-flow__node.selected .mind-node {
+	border-color: #3b82f6;
+	box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}

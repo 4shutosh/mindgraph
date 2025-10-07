@@ -1,0 +1,40 @@
+# MindGraph Project Rules
+
+## Code Style
+
+- Use TypeScript strict mode
+- Prefer functional components with hooks
+- Use meaningful variable names (no abbreviations)
+- Keep components focused and modular
+
+## Architecture Principles
+
+- TreeNode is the source of truth (stored in nodes map)
+- NodeInstance represents visual appearances on canvas
+- Multiple instances can reference the same TreeNode
+- Updates to TreeNode reflect in all instances
+
+## Key Patterns
+
+- Use React Flow for canvas management
+- Store graph data in a single MindGraph object
+- Auto-save to localStorage on every change
+- Keyboard shortcuts follow Whimsical conventions:
+  - Enter creates siblings (same depth)
+  - Tab creates children (one level deeper)
+  - Space opens editor for focused node
+  - Click node to focus for keyboard navigation
+
+## File Organization
+
+- /types - TypeScript interfaces
+- /components - React components
+- /utils - Helper functions and utilities
+- Keep business logic separate from UI
+
+## Future Considerations
+
+- Design for Logseq/Markdown integration
+- Keep data structure flexible for backend sync
+- Maintain keyboard-first UX philosophy
+- Minimize UI chrome, maximize canvas space
