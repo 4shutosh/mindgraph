@@ -521,9 +521,6 @@ export default function Canvas({ graph, onGraphChange }: CanvasProps) {
 							<kbd>Tab</kbd> → Child
 						</div>
 						<div className="hint">
-							<kbd>⌘↑/↓</kbd> → Reorder
-						</div>
-						<div className="hint">
 							<kbd>Del</kbd> → Delete
 						</div>
 						<div className="hint">
