@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import ReactFlow, {
 	Node,
 	Edge,
@@ -12,6 +12,7 @@ import ReactFlow, {
 	BackgroundVariant,
 	Panel,
 	SelectionMode,
+	ReactFlowInstance,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
@@ -63,6 +64,7 @@ export default function Canvas({
 	const [editingInstanceId, setEditingInstanceId] = useState<string | null>(
 		null
 	);
+	const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
 
 	// Start editing a node
 	const handleStartEdit = useCallback((instanceId: string) => {
@@ -163,14 +165,30 @@ export default function Canvas({
 				updatedAt: Date.now(),
 			};
 
+			// Find the instance that was being edited to maintain focus
+			const editingInstance = graph.instances.find(
+				(inst) => inst.instanceId === editingInstanceId
+			);
+
 			onGraphChange({
 				...graph,
 				nodes: { ...graph.nodes, [nodeId]: updatedNode },
+				// Ensure the edited instance remains focused after editing
+				focusedInstanceId:
+					editingInstance?.instanceId || graph.focusedInstanceId,
 			});
 
 			setEditingInstanceId(null);
+
+			// Ensure canvas regains focus after editing
+			setTimeout(() => {
+				const canvasElement = document.querySelector(".react-flow");
+				if (canvasElement instanceof HTMLElement) {
+					canvasElement.focus();
+				}
+			}, 100);
 		},
-		[graph, onGraphChange, deleteNode, nodeHasChildren]
+		[graph, onGraphChange, deleteNode, nodeHasChildren, editingInstanceId]
 	);
 
 	// Cancel editing - only delete if node is empty AND has no children
@@ -186,6 +204,14 @@ export default function Canvas({
 			}
 			// If node has content or children, just exit edit mode
 			setEditingInstanceId(null);
+
+			// Ensure canvas regains focus after editing
+			setTimeout(() => {
+				const canvasElement = document.querySelector(".react-flow");
+				if (canvasElement instanceof HTMLElement) {
+					canvasElement.focus();
+				}
+			}, 100);
 		},
 		[graph.nodes, deleteNode, nodeHasChildren]
 	);
@@ -431,6 +457,11 @@ export default function Canvas({
 		});
 	}, [graph, onGraphChange]);
 
+	// Handle ReactFlow initialization
+	const onInit = useCallback((instance: ReactFlowInstance) => {
+		reactFlowInstance.current = instance;
+	}, []);
+
 	// Arrow key navigation handlers - only move if valid target exists
 	const handleNavigateLeft = useCallback(() => {
 		if (!graph.focusedInstanceId) return;
@@ -559,11 +590,12 @@ export default function Canvas({
 	// Handle keyboard events through React Flow's onKeyDown
 	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent) => {
-			// Ignore if typing in input/textarea
+			// Ignore if typing in input/textarea or if we're currently editing
 			if (
 				editingInstanceId ||
 				e.target instanceof HTMLInputElement ||
-				e.target instanceof HTMLTextAreaElement
+				e.target instanceof HTMLTextAreaElement ||
+				e.target instanceof HTMLButtonElement
 			) {
 				return;
 			}
@@ -647,10 +679,12 @@ export default function Canvas({
 				onConnect={onConnect}
 				onNodeClick={handleNodeClick}
 				onKeyDown={handleKeyDown}
+				onInit={onInit}
 				nodeTypes={nodeTypes}
-				fitView
 				minZoom={0.1}
 				maxZoom={2}
+				fitView
+				fitViewOptions={{ padding: 0.5, duration: 0 }}
 				defaultEdgeOptions={{
 					type: "default",
 					animated: false,
@@ -663,6 +697,7 @@ export default function Canvas({
 				selectionMode={SelectionMode.Partial}
 				nodesDraggable={true}
 				elementsSelectable={true}
+				tabIndex={0}
 			>
 				<Background variant={BackgroundVariant.Dots} gap={16} size={1} />
 				<Controls />

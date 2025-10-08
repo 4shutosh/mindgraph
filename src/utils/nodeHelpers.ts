@@ -112,7 +112,7 @@ export function calculateSiblingPosition(
 	_siblings: NodeInstance[]
 ): { x: number; y: number } {
 	// Position below the current node (same x, different y)
-	const verticalSpacing = 100;
+	const verticalSpacing = 80;
 	return {
 		x: currentInstance.position.x,
 		y: currentInstance.position.y + verticalSpacing,
@@ -127,8 +127,8 @@ export function calculateChildPosition(
 	parentInstance: NodeInstance,
 	existingChildren: NodeInstance[]
 ): { x: number; y: number } {
-	const horizontalSpacing = 280; // Space to the right for children
-	const verticalSpacing = 100; // Space down for multiple children
+	const horizontalSpacing = 200; // Space to the right for children
+	const verticalSpacing = 80; // Space down for multiple children
 
 	// If no children, position to the right at same y level
 	if (existingChildren.length === 0) {
@@ -232,7 +232,7 @@ export function updateSiblingPositions(
 	currentInstance: NodeInstance,
 	instances: NodeInstance[]
 ): NodeInstance[] {
-	const verticalSpacing = 100;
+	const verticalSpacing = 80;
 
 	return instances.map((instance) => {
 		// Only update siblings of the same parent that come after the current instance

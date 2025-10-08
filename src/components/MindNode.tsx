@@ -60,6 +60,10 @@ function MindNode({ data, selected }: NodeProps<MindNodeData>) {
 				setEditValue(node.title);
 				onFinishEdit(node.nodeId, node.title);
 			}
+		} else if (e.key === "Tab") {
+			// Allow Tab to work normally in input (for indentation, etc.)
+			// Don't prevent default or stop propagation
+			return;
 		}
 	};
 
