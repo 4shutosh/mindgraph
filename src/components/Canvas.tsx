@@ -42,10 +42,7 @@ const nodeTypes: NodeTypes = {
 interface CanvasProps {
 	graph: MindGraph;
 	onGraphChange: (graph: MindGraph) => void;
-	canUndo: boolean;
-	canRedo: boolean;
-	onUndo: () => void;
-	onRedo: () => void;
+	instanceToEditId: string | null;
 }
 
 /**
@@ -54,10 +51,7 @@ interface CanvasProps {
 export default function Canvas({
 	graph,
 	onGraphChange,
-	canUndo,
-	canRedo,
-	onUndo,
-	onRedo,
+	instanceToEditId,
 }: CanvasProps) {
 	const [nodes, setNodes, onNodesChange] = useNodesState([]);
 	const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -65,6 +59,13 @@ export default function Canvas({
 		null
 	);
 	const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+
+	// Effect to trigger editing mode from parent
+	useEffect(() => {
+		if (instanceToEditId) {
+			setEditingInstanceId(instanceToEditId);
+		}
+	}, [instanceToEditId]);
 
 	// Start editing a node
 	const handleStartEdit = useCallback((instanceId: string) => {
@@ -448,15 +449,6 @@ export default function Canvas({
 		[graph, onGraphChange]
 	);
 
-	// Apply auto-layout to balance the tree
-	const handleAutoAlign = useCallback(() => {
-		const balancedInstances = applyBalancedLayout(graph.instances);
-		onGraphChange({
-			...graph,
-			instances: balancedInstances,
-		});
-	}, [graph, onGraphChange]);
-
 	// Handle ReactFlow initialization
 	const onInit = useCallback((instance: ReactFlowInstance) => {
 		reactFlowInstance.current = instance;
@@ -637,11 +629,6 @@ export default function Canvas({
 					handleCreateChild();
 				}
 			}
-			// Create new node: Cmd/Ctrl + N
-			else if ((e.metaKey || e.ctrlKey) && e.key === "n") {
-				e.preventDefault();
-				handleCreateNode();
-			}
 			// Create sibling: Enter (when no node is focused)
 			else if (e.key === "Enter") {
 				e.preventDefault();
@@ -661,7 +648,6 @@ export default function Canvas({
 			handleNavigateRight,
 			handleNavigateDown,
 			handleNavigateUp,
-			handleCreateNode,
 			handleCreateSibling,
 			handleCreateChild,
 			handleDeleteNodes,
@@ -701,82 +687,7 @@ export default function Canvas({
 			>
 				<Background variant={BackgroundVariant.Dots} gap={16} size={1} />
 				<Controls />
-				<MiniMap />
-
-				<Panel position="top-left" className="control-panel">
-					<div className="button-group">
-						<button className="btn btn-primary" onClick={handleCreateNode}>
-							+ New Node (⌘N)
-						</button>
-
-						<button
-							className="btn btn-secondary"
-							onClick={handleAutoAlign}
-							title="Auto-align and balance tree layout"
-						>
-							⚡ Auto-align
-						</button>
-					</div>
-
-					<div className="button-group history-buttons">
-						<button
-							className="btn btn-history"
-							onClick={onUndo}
-							disabled={!canUndo}
-							title="Undo (⌘Z)"
-						>
-							↶ Undo
-						</button>
-						<button
-							className="btn btn-history"
-							onClick={onRedo}
-							disabled={!canRedo}
-							title="Redo (⌘⇧Z)"
-						>
-							↷ Redo
-						</button>
-					</div>
-
-					<div className="stats">
-						<span>{Object.keys(graph.nodes).length} unique nodes</span>
-						<span>{graph.instances.length} instances</span>
-					</div>
-					<div className="keyboard-hints">
-						<div className="hint">
-							<kbd>⌘Z</kbd> → Undo
-						</div>
-						<div className="hint">
-							<kbd>⌘⇧Z</kbd> → Redo
-						</div>
-						<div className="hint">
-							<kbd>←</kbd> → Parent
-						</div>
-						<div className="hint">
-							<kbd>→</kbd> → Child
-						</div>
-						<div className="hint">
-							<kbd>↑</kbd> → Prev Sibling
-						</div>
-						<div className="hint">
-							<kbd>↓</kbd> → Next Sibling
-						</div>
-						<div className="hint">
-							<kbd>Enter</kbd> → Sibling
-						</div>
-						<div className="hint">
-							<kbd>Tab</kbd> → Child
-						</div>
-						<div className="hint">
-							<kbd>Del</kbd> → Delete
-						</div>
-						<div className="hint">
-							<kbd>Space + Drag</kbd> → Pan
-						</div>
-						<div className="hint">
-							<kbd>Click + Drag</kbd> → Select
-						</div>
-					</div>
-				</Panel>
+				{/* <MiniMap /> */}
 			</ReactFlow>
 		</div>
 	);
