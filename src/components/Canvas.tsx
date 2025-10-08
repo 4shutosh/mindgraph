@@ -114,18 +114,41 @@ export default function Canvas({ graph, onGraphChange }: CanvasProps) {
 		[graph, onGraphChange]
 	);
 
+	// Check if a node has any children instances
+	const nodeHasChildren = useCallback(
+		(nodeId: string): boolean => {
+			// Find all instances of this node
+			const nodeInstances = graph.instances.filter(
+				(inst) => inst.nodeId === nodeId
+			);
+			// Check if any instance has children
+			return nodeInstances.some((instance) => {
+				const children = getChildrenInstances(
+					instance.instanceId,
+					graph.instances
+				);
+				return children.length > 0;
+			});
+		},
+		[graph.instances]
+	);
+
 	// Finish editing and save changes
 	const handleFinishEdit = useCallback(
 		(nodeId: string, newTitle: string) => {
-			// If title is empty, delete the node instead of saving
+			// If title is empty, only delete if node has no children
 			if (newTitle.trim() === "") {
-				deleteNode(nodeId);
-				return;
+				if (!nodeHasChildren(nodeId)) {
+					deleteNode(nodeId);
+					return;
+				}
+				// If node has children, keep it with empty title
+				// (User can manually delete it later if needed)
 			}
 
 			const updatedNode = {
 				...graph.nodes[nodeId],
-				title: newTitle,
+				title: newTitle.trim() || "(empty)", // Show placeholder for empty nodes with children
 				updatedAt: Date.now(),
 			};
 
@@ -136,15 +159,24 @@ export default function Canvas({ graph, onGraphChange }: CanvasProps) {
 
 			setEditingInstanceId(null);
 		},
-		[graph, onGraphChange, deleteNode]
+		[graph, onGraphChange, deleteNode, nodeHasChildren]
 	);
 
-	// Cancel editing and delete node if empty
+	// Cancel editing - only delete if node is empty AND has no children
 	const handleCancelEdit = useCallback(
 		(nodeId: string) => {
-			deleteNode(nodeId);
+			const node = graph.nodes[nodeId];
+			// Only delete if the node is empty/new and has no children
+			if (!node.title || node.title.trim() === "") {
+				if (!nodeHasChildren(nodeId)) {
+					deleteNode(nodeId);
+					return;
+				}
+			}
+			// If node has content or children, just exit edit mode
+			setEditingInstanceId(null);
 		},
-		[deleteNode]
+		[graph.nodes, deleteNode, nodeHasChildren]
 	);
 
 	// Convert graph data to React Flow format
