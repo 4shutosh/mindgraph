@@ -202,6 +202,37 @@ kbd {
 	background: #d1d5db;
 }
 
+.btn-history {
+	background: #f3f4f6;
+	color: #374151;
+	border: 1px solid #d1d5db;
+	font-size: 0.8rem;
+	padding: 6px 12px;
+}
+
+.btn-history:hover:not(:disabled) {
+	background: #e5e7eb;
+	border-color: #9ca3af;
+}
+
+.btn-history:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Button groups */
+.button-group {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.history-buttons {
+	padding-top: 8px;
+	margin-top: 8px;
+	border-top: 1px solid #e5e7eb;
+}
+
 /* React Flow Customization */
 .react-flow__node {
 	cursor: grab;
@@ -237,11 +268,16 @@ kbd {
 /* Bezier edge styling - smooth curves */
 .react-flow__edge {
 	cursor: default;
+	pointer-events: none !important;
 }
 
 .react-flow__edge:hover .react-flow__edge-path {
-	stroke: #6b7280;
-	stroke-width: 3;
+	stroke: #9ca3af;
+	stroke-width: 2.5;
+}
+
+.react-flow__edge-path {
+	pointer-events: none !important;
 }
 
 .react-flow__minimap {

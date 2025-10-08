@@ -109,7 +109,7 @@ export function getSiblingInstances(
  */
 export function calculateSiblingPosition(
 	currentInstance: NodeInstance,
-	siblings: NodeInstance[]
+	_siblings: NodeInstance[]
 ): { x: number; y: number } {
 	// Position below the current node (same x, different y)
 	const verticalSpacing = 100;

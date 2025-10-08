@@ -48,9 +48,11 @@ function MindNode({ data, selected }: NodeProps<MindNodeData>) {
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
 		if (e.key === "Enter") {
 			e.preventDefault();
+			e.stopPropagation(); // Prevent event from bubbling to Canvas
 			handleFinishEdit();
 		} else if (e.key === "Escape") {
 			e.preventDefault();
+			e.stopPropagation(); // Prevent event from bubbling to Canvas
 			// If input is empty (including just created nodes), delete the node
 			if (editValue.trim() === "") {
 				onCancelEdit(node.nodeId);
