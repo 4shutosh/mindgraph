@@ -276,6 +276,21 @@ export default function Canvas({
 		syncGraphToFlow();
 	}, [syncGraphToFlow]);
 
+	// Pan to newly created/editing nodes
+	useEffect(() => {
+		if (editingInstanceId && reactFlowInstance.current) {
+			const node = reactFlowInstance.current.getNode(editingInstanceId);
+			if (node) {
+				const zoom = reactFlowInstance.current.getZoom();
+				reactFlowInstance.current.setCenter(
+					node.position.x + 75, // offset to center of node (approximate)
+					node.position.y + 20,
+					{ zoom, duration: 300 }
+				);
+			}
+		}
+	}, [editingInstanceId]);
+
 	// Update graph when nodes are moved
 	const handleNodesChange = useCallback(
 		(changes: any) => {
@@ -392,7 +407,9 @@ export default function Canvas({
 
 		onGraphChange(updatedGraph);
 		// Start editing immediately
-		setTimeout(() => setEditingInstanceId(newInstance.instanceId), 50);
+		setTimeout(() => {
+			setEditingInstanceId(newInstance.instanceId);
+		}, 50);
 	}, [graph, onGraphChange]);
 
 	// Create a child node (Tab key)
@@ -435,7 +452,9 @@ export default function Canvas({
 
 		onGraphChange(updatedGraph);
 		// Start editing immediately
-		setTimeout(() => setEditingInstanceId(newInstance.instanceId), 50);
+		setTimeout(() => {
+			setEditingInstanceId(newInstance.instanceId);
+		}, 50);
 	}, [graph, onGraphChange]);
 
 	// Handle node click to focus
@@ -452,6 +471,10 @@ export default function Canvas({
 	// Handle ReactFlow initialization
 	const onInit = useCallback((instance: ReactFlowInstance) => {
 		reactFlowInstance.current = instance;
+		// Fit view only once on init
+		setTimeout(() => {
+			instance.fitView({ padding: 0.2, maxZoom: 1, duration: 0 });
+		}, 0);
 	}, []);
 
 	// Arrow key navigation handlers - only move if valid target exists
@@ -656,39 +679,43 @@ export default function Canvas({
 	);
 
 	return (
-		<div className="canvas-container">
-			<ReactFlow
-				nodes={nodes}
-				edges={edges}
-				onNodesChange={handleNodesChange}
-				onEdgesChange={onEdgesChange}
-				onConnect={onConnect}
-				onNodeClick={handleNodeClick}
-				onKeyDown={handleKeyDown}
-				onInit={onInit}
-				nodeTypes={nodeTypes}
-				minZoom={0.1}
-				maxZoom={2}
-				fitView
-				fitViewOptions={{ padding: 0.5, duration: 0 }}
-				defaultEdgeOptions={{
-					type: "default",
-					animated: false,
-				}}
-				connectOnClick={false}
-				panOnDrag={false}
-				selectionOnDrag={true}
-				panActivationKeyCode="Space"
-				multiSelectionKeyCode="Shift"
-				selectionMode={SelectionMode.Partial}
-				nodesDraggable={true}
-				elementsSelectable={true}
-				tabIndex={0}
-			>
-				<Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-				<Controls />
-				{/* <MiniMap /> */}
-			</ReactFlow>
-		</div>
+		<ReactFlow
+			nodes={nodes}
+			edges={edges}
+			onNodesChange={handleNodesChange}
+			onEdgesChange={onEdgesChange}
+			onConnect={onConnect}
+			onNodeClick={handleNodeClick}
+			onKeyDown={handleKeyDown}
+			onInit={onInit}
+			nodeTypes={nodeTypes}
+			minZoom={0.1}
+			maxZoom={2}
+			fitViewOptions={{
+				padding: 0.2,
+				includeHiddenNodes: false,
+				minZoom: 0.1,
+				maxZoom: 1,
+				duration: 400,
+			}}
+			defaultEdgeOptions={{
+				type: "default",
+				animated: false,
+			}}
+			connectOnClick={false}
+			panOnDrag={false}
+			panOnScroll={true}
+			selectionOnDrag={true}
+			panActivationKeyCode="Space"
+			multiSelectionKeyCode="Shift"
+			selectionMode={SelectionMode.Partial}
+			nodesDraggable={true}
+			elementsSelectable={true}
+			tabIndex={0}
+		>
+			<Background variant={BackgroundVariant.Dots} />
+			<Controls />
+			{/* <MiniMap /> */}
+		</ReactFlow>
 	);
 }
