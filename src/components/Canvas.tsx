@@ -1,20 +1,19 @@
 import { useCallback, useEffect, useState, useRef } from "react";
-import ReactFlow, {
+import {
+	ReactFlow,
 	Node,
 	Edge,
 	Background,
 	Controls,
-	MiniMap,
 	useNodesState,
 	useEdgesState,
 	Connection,
 	NodeTypes,
 	BackgroundVariant,
-	Panel,
 	SelectionMode,
 	ReactFlowInstance,
-} from "reactflow";
-import "reactflow/dist/style.css";
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 
 import { MindGraph } from "../types";
 import {
@@ -32,7 +31,6 @@ import {
 	getPreviousSiblingInstance,
 	updateSiblingPositions,
 } from "../utils/nodeHelpers";
-import { applyBalancedLayout } from "../utils/layoutHelpers";
 import MindNode, { MindNodeData } from "./MindNode";
 
 const nodeTypes: NodeTypes = {
@@ -53,12 +51,18 @@ export default function Canvas({
 	onGraphChange,
 	instanceToEditId,
 }: CanvasProps) {
-	const [nodes, setNodes, onNodesChange] = useNodesState([]);
-	const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+	const [nodes, setNodes, onNodesChange] = useNodesState<Node<MindNodeData>>(
+		[]
+	);
+	const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 	const [editingInstanceId, setEditingInstanceId] = useState<string | null>(
 		null
 	);
-	const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+	const reactFlowInstance = useRef<ReactFlowInstance<
+		Node<MindNodeData>,
+		Edge
+	> | null>(null);
+	const hasInitialFit = useRef(false);
 
 	// Effect to trigger editing mode from parent
 	useEffect(() => {
@@ -276,6 +280,27 @@ export default function Canvas({
 		syncGraphToFlow();
 	}, [syncGraphToFlow]);
 
+	// Initial fit view once nodes are loaded
+	useEffect(() => {
+		if (
+			!hasInitialFit.current &&
+			nodes.length > 0 &&
+			reactFlowInstance.current
+		) {
+			hasInitialFit.current = true;
+			// Use requestAnimationFrame to ensure nodes are rendered
+			requestAnimationFrame(() => {
+				if (reactFlowInstance.current) {
+					reactFlowInstance.current.fitView({
+						padding: 0.2,
+						maxZoom: 1,
+						duration: 0,
+					});
+				}
+			});
+		}
+	}, [nodes]);
+
 	// Pan to newly created/editing nodes
 	useEffect(() => {
 		if (editingInstanceId && reactFlowInstance.current) {
@@ -327,33 +352,6 @@ export default function Canvas({
 			"Manual edge creation disabled. Use Tab/Enter to create connected nodes."
 		);
 	}, []);
-
-	// Create a new node (used for Cmd+N or button click)
-	const handleCreateNode = useCallback(() => {
-		const newNode = createNode();
-		const instance = createNodeInstance(
-			newNode.nodeId,
-			{
-				x: Math.random() * 400 + 100,
-				y: Math.random() * 400 + 100,
-			},
-			null,
-			0,
-			0
-		);
-
-		const updatedGraph: MindGraph = {
-			...graph,
-			nodes: { ...graph.nodes, [newNode.nodeId]: newNode },
-			instances: [...graph.instances, instance],
-			rootNodeId: graph.rootNodeId || newNode.nodeId,
-			focusedInstanceId: instance.instanceId,
-		};
-
-		onGraphChange(updatedGraph);
-		// Start editing immediately
-		setTimeout(() => setEditingInstanceId(instance.instanceId), 50);
-	}, [graph, onGraphChange]);
 
 	// Create a sibling node (Enter key)
 	const handleCreateSibling = useCallback(() => {
@@ -464,18 +462,26 @@ export default function Canvas({
 				...graph,
 				focusedInstanceId: node.id,
 			});
+
+			// Ensure React Flow container gets focus for keyboard navigation
+			// Use requestAnimationFrame for better timing with React's rendering cycle
+			requestAnimationFrame(() => {
+				const reactFlowElement = document.querySelector(".react-flow");
+				if (reactFlowElement instanceof HTMLElement) {
+					reactFlowElement.focus();
+				}
+			});
 		},
 		[graph, onGraphChange]
 	);
 
 	// Handle ReactFlow initialization
-	const onInit = useCallback((instance: ReactFlowInstance) => {
-		reactFlowInstance.current = instance;
-		// Fit view only once on init
-		setTimeout(() => {
-			instance.fitView({ padding: 0.2, maxZoom: 1, duration: 0 });
-		}, 0);
-	}, []);
+	const onInit = useCallback(
+		(instance: ReactFlowInstance<Node<MindNodeData>, Edge>) => {
+			reactFlowInstance.current = instance;
+		},
+		[]
+	);
 
 	// Arrow key navigation handlers - only move if valid target exists
 	const handleNavigateLeft = useCallback(() => {
@@ -602,15 +608,30 @@ export default function Canvas({
 		}
 	}, [nodes, graph, onGraphChange, editingInstanceId]);
 
-	// Handle keyboard events through React Flow's onKeyDown
-	const handleKeyDown = useCallback(
-		(e: React.KeyboardEvent) => {
+	// Global keyboard event listener for React Flow v12 compatibility
+	// Note: React Flow v12 changed how onKeyDown events are handled internally.
+	// The onKeyDown prop no longer works reliably, so we use a global event listener instead.
+	useEffect(() => {
+		const handleGlobalKeyDown = (e: KeyboardEvent) => {
+			// Only handle if React Flow container has focus or if a node is focused
+			const reactFlowElement = document.querySelector(".react-flow");
+			if (!reactFlowElement || !document.activeElement) return;
+
+			// Check if focus is within React Flow or if we have a focused node
+			const isWithinReactFlow =
+				reactFlowElement.contains(document.activeElement) ||
+				document.activeElement === reactFlowElement ||
+				graph.focusedInstanceId;
+
+			if (!isWithinReactFlow) return;
+
 			// Ignore if typing in input/textarea or if we're currently editing
 			if (
 				editingInstanceId ||
 				e.target instanceof HTMLInputElement ||
 				e.target instanceof HTMLTextAreaElement ||
-				e.target instanceof HTMLButtonElement
+				e.target instanceof HTMLButtonElement ||
+				e.target instanceof HTMLSelectElement
 			) {
 				return;
 			}
@@ -662,21 +683,21 @@ export default function Canvas({
 				e.preventDefault();
 				handleCreateChild();
 			}
-			// Note: Space is now used for panning (Space + drag)
-			// Edit via double-click only to prevent conflicts
-		},
-		[
-			graph,
-			handleNavigateLeft,
-			handleNavigateRight,
-			handleNavigateDown,
-			handleNavigateUp,
-			handleCreateSibling,
-			handleCreateChild,
-			handleDeleteNodes,
-			editingInstanceId,
-		]
-	);
+		};
+
+		window.addEventListener("keydown", handleGlobalKeyDown);
+		return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+	}, [
+		graph,
+		handleNavigateLeft,
+		handleNavigateRight,
+		handleNavigateDown,
+		handleNavigateUp,
+		handleCreateSibling,
+		handleCreateChild,
+		handleDeleteNodes,
+		editingInstanceId,
+	]);
 
 	return (
 		<ReactFlow
@@ -686,7 +707,6 @@ export default function Canvas({
 			onEdgesChange={onEdgesChange}
 			onConnect={onConnect}
 			onNodeClick={handleNodeClick}
-			onKeyDown={handleKeyDown}
 			onInit={onInit}
 			nodeTypes={nodeTypes}
 			minZoom={0.1}
@@ -711,6 +731,9 @@ export default function Canvas({
 			selectionMode={SelectionMode.Partial}
 			nodesDraggable={true}
 			elementsSelectable={true}
+			nodesFocusable={true}
+			edgesFocusable={false}
+			disableKeyboardA11y={false}
 			tabIndex={0}
 		>
 			<Background variant={BackgroundVariant.Dots} />

@@ -1,8 +1,8 @@
 import { memo, useState, useRef, useEffect } from "react";
-import { Handle, Position, NodeProps } from "reactflow";
+import { Handle, Position, NodeProps } from "@xyflow/react";
 import { TreeNode } from "../types";
 
-export interface MindNodeData {
+export interface MindNodeData extends Record<string, unknown> {
 	node: TreeNode;
 	isEditing: boolean;
 	isRoot: boolean;
@@ -14,9 +14,9 @@ export interface MindNodeData {
 /**
  * Custom node component for the mindgraph with inline editing
  */
-function MindNode({ data, selected }: NodeProps<MindNodeData>) {
+function MindNode({ data, selected }: NodeProps) {
 	const { node, isEditing, isRoot, onStartEdit, onFinishEdit, onCancelEdit } =
-		data;
+		data as MindNodeData;
 	const [editValue, setEditValue] = useState(node.title);
 	const inputRef = useRef<HTMLInputElement>(null);
 

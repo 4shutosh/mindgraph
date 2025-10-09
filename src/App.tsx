@@ -122,10 +122,6 @@ function App() {
 			<Header
 				onNewNode={handleCreateNode}
 				onAutoAlign={handleAutoAlign}
-				onUndo={undo}
-				onRedo={redo}
-				canUndo={canUndo}
-				canRedo={canRedo}
 				onToggleShortcuts={() => setIsShortcutsModalOpen(true)}
 			/>
 

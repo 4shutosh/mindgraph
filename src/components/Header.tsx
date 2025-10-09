@@ -3,21 +3,13 @@ import React from "react";
 interface HeaderProps {
 	onNewNode: () => void;
 	onAutoAlign: () => void;
-	onUndo: () => void;
-	onRedo: () => void;
 	onToggleShortcuts: () => void;
-	canUndo: boolean;
-	canRedo: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({
 	onNewNode,
 	onAutoAlign,
-	onUndo,
-	onRedo,
 	onToggleShortcuts,
-	canUndo,
-	canRedo,
 }) => {
 	return (
 		<header className="app-header">
