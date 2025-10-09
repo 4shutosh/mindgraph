@@ -65,7 +65,6 @@ export default function Canvas({
 		Node<MindNodeData>,
 		Edge
 	> | null>(null);
-	const hasInitialFit = useRef(false);
 
 	// Effect to trigger editing mode from parent
 	useEffect(() => {
@@ -282,27 +281,6 @@ export default function Canvas({
 	useEffect(() => {
 		syncGraphToFlow();
 	}, [syncGraphToFlow]);
-
-	// Initial fit view once nodes are loaded
-	useEffect(() => {
-		if (
-			!hasInitialFit.current &&
-			nodes.length > 0 &&
-			reactFlowInstance.current
-		) {
-			hasInitialFit.current = true;
-			// Use requestAnimationFrame to ensure nodes are rendered
-			requestAnimationFrame(() => {
-				if (reactFlowInstance.current) {
-					reactFlowInstance.current.fitView({
-						padding: 0.2,
-						maxZoom: 1,
-						duration: 0,
-					});
-				}
-			});
-		}
-	}, [nodes]);
 
 	// Pan to newly created/editing nodes
 	useEffect(() => {
@@ -725,13 +703,7 @@ export default function Canvas({
 			nodeTypes={nodeTypes}
 			minZoom={0.1}
 			maxZoom={2}
-			fitViewOptions={{
-				padding: 0.2,
-				includeHiddenNodes: false,
-				minZoom: 0.1,
-				maxZoom: 1,
-				duration: 400,
-			}}
+			fitView
 			defaultEdgeOptions={{
 				type: "default",
 				animated: false,
