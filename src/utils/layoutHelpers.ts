@@ -4,7 +4,7 @@ import { NodeInstance } from "../types";
  * Auto-layout configuration
  */
 const LAYOUT_CONFIG = {
-	horizontalSpacing: 160, // Distance between parent and child (left to right)
+	horizontalSpacing: 140, // Distance between parent and child (left to right)
 	verticalSpacing: 80, // Distance between siblings (top to bottom)
 	startX: 100, // Starting X position for root nodes
 	startY: 100, // Starting Y position for root nodes

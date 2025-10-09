@@ -127,7 +127,7 @@ export function calculateChildPosition(
 	parentInstance: NodeInstance,
 	existingChildren: NodeInstance[]
 ): { x: number; y: number } {
-	const horizontalSpacing = 200; // Space to the right for children
+	const horizontalSpacing = 140; // Reduced from 200 to 120 for shorter edges
 	const verticalSpacing = 80; // Space down for multiple children
 
 	// If no children, position to the right at same y level
