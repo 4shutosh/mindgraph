@@ -58,6 +58,9 @@ export default function Canvas({
 	const [editingInstanceId, setEditingInstanceId] = useState<string | null>(
 		null
 	);
+	const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(
+		new Set()
+	);
 	const reactFlowInstance = useRef<ReactFlowInstance<
 		Node<MindNodeData>,
 		Edge
@@ -455,6 +458,15 @@ export default function Canvas({
 		}, 50);
 	}, [graph, onGraphChange]);
 
+	// Handle selection change
+	const handleSelectionChange = useCallback(
+		({ nodes: selectedNodes }: { nodes: Node[] }) => {
+			const selectedIds = new Set(selectedNodes.map((node) => node.id));
+			setSelectedNodeIds(selectedIds);
+		},
+		[]
+	);
+
 	// Handle node click to focus
 	const handleNodeClick = useCallback(
 		(_event: React.MouseEvent, node: Node) => {
@@ -550,11 +562,12 @@ export default function Canvas({
 
 	// Delete selected nodes and their subtrees
 	const handleDeleteNodes = useCallback(() => {
-		// Get selected nodes from React Flow
-		const selectedNodes = nodes.filter((node) => node.selected);
-		if (selectedNodes.length === 0) return;
+		// Use our tracked selection state
+		if (selectedNodeIds.size === 0) {
+			return;
+		}
 
-		const selectedInstanceIds = new Set(selectedNodes.map((n) => n.id));
+		const selectedInstanceIds = Array.from(selectedNodeIds);
 
 		// Find all descendants of selected nodes
 		const instancesToDelete = new Set<string>();
@@ -606,7 +619,7 @@ export default function Canvas({
 		if (editingInstanceId && instancesToDelete.has(editingInstanceId)) {
 			setEditingInstanceId(null);
 		}
-	}, [nodes, graph, onGraphChange, editingInstanceId]);
+	}, [selectedNodeIds, graph, onGraphChange, editingInstanceId]);
 
 	// Global keyboard event listener for React Flow v12 compatibility
 	// Note: React Flow v12 changed how onKeyDown events are handled internally.
@@ -707,6 +720,7 @@ export default function Canvas({
 			onEdgesChange={onEdgesChange}
 			onConnect={onConnect}
 			onNodeClick={handleNodeClick}
+			onSelectionChange={handleSelectionChange}
 			onInit={onInit}
 			nodeTypes={nodeTypes}
 			minZoom={0.1}
