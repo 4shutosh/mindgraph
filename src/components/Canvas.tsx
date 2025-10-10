@@ -874,19 +874,12 @@ export default function Canvas({
 				let closestParent: string | null = null;
 				let closestDistance = Infinity;
 
-				console.log("🔍 Reparent mode active, finding valid targets...");
-
 				graph.instances.forEach((instance) => {
 					// Skip self and invalid targets
 					if (
 						instance.instanceId === draggingNodeId ||
 						wouldCreateCircularDependency(draggingNodeId, instance.instanceId)
 					) {
-						if (instance.instanceId !== draggingNodeId) {
-							console.log(
-								`❌ Skipping ${graph.nodes[instance.nodeId]?.title} - would create circular dependency`
-							);
-						}
 						return;
 					}
 
@@ -901,10 +894,6 @@ export default function Canvas({
 							Math.pow(targetNode.position.y - node.position.y, 2)
 					);
 
-					console.log(
-						`✅ Valid target: ${graph.nodes[instance.nodeId]?.title} - distance: ${distance.toFixed(0)}px`
-					);
-
 					// Update closest if this is nearer and within reasonable range
 					const MAX_DROP_DISTANCE = 300; // Increased range to make targeting easier
 					if (distance < closestDistance && distance < MAX_DROP_DISTANCE) {
@@ -912,12 +901,6 @@ export default function Canvas({
 						closestParent = instance.instanceId;
 					}
 				});
-
-				if (closestParent) {
-					console.log(
-						`🎯 Closest target: ${graph.nodes[graph.instances.find((i) => i.instanceId === closestParent)?.nodeId || ""]?.title}`
-					);
-				}
 
 				setPotentialDropParentId(closestParent);
 				setTargetDropOrder(null); // Clear reorder target
