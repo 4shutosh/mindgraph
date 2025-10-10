@@ -4,7 +4,7 @@ I was building a knowledge based decision tree, where a set of decisions kept re
 
 Here is my attempt to solve that usecase. This will be a keyboard first mindgraph - a mindmap where you can hyperlink nodes - so a graph :)
 
-![mindgraph](demo.png)
+![mindgraph-demo](demo.png)
 
 ### Installation
 
