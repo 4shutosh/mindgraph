@@ -44,6 +44,9 @@ export interface NodeInstance {
 
 	/** Order among siblings (for consistent layout) */
 	siblingOrder: number;
+
+	/** Whether this node's children are collapsed/hidden */
+	isCollapsed?: boolean;
 }
 
 /**

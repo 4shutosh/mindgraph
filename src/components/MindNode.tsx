@@ -1,4 +1,4 @@
-import { memo, useRef, useEffect } from "react";
+import { memo, useRef, useEffect, useState } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { TreeNode } from "../types";
 
@@ -13,12 +13,16 @@ export interface MindNodeData extends Record<string, unknown> {
 	isDragOver?: boolean;
 	isValidDropTarget?: boolean;
 	isDropTargetHovered?: boolean;
+	isCollapsed?: boolean;
+	collapsedCount?: number;
+	hasChildren?: boolean;
+	onToggleCollapse?: (instanceId: string) => void;
 }
 
 /**
  * Custom node component for the mindgraph with inline editing using contentEditable
  */
-function MindNode({ data, selected }: NodeProps) {
+function MindNode({ data, selected, id }: NodeProps) {
 	const {
 		node,
 		isEditing,
@@ -30,12 +34,25 @@ function MindNode({ data, selected }: NodeProps) {
 		isDragOver,
 		isValidDropTarget,
 		isDropTargetHovered,
+		isCollapsed,
+		collapsedCount,
+		hasChildren,
+		onToggleCollapse,
 	} = data as MindNodeData;
 	const contentRef = useRef<HTMLDivElement>(null);
 	const originalValueRef = useRef<string>(node.title);
 	const initialWidthRef = useRef<number>(0);
 	const nodeRef = useRef<HTMLDivElement>(null);
 	const currentWidthRef = useRef<number>(0);
+	const [isHovered, setIsHovered] = useState(false);
+
+	const handleToggleClick = (e: React.MouseEvent) => {
+		e.stopPropagation();
+		e.preventDefault();
+		if (onToggleCollapse) {
+			onToggleCollapse(id);
+		}
+	};
 
 	// Focus and select text when editing starts
 	useEffect(() => {
@@ -139,7 +156,9 @@ function MindNode({ data, selected }: NodeProps) {
 				isDragOver ? "drag-over" : ""
 			} ${isValidDropTarget ? "drop-target" : ""} ${
 				isDropTargetHovered ? "drop-target-hovered" : ""
-			}`}
+			} ${isCollapsed ? "collapsed" : ""}`}
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
 		>
 			{/* Handle positioning: center for root, sides for children */}
 			<Handle
@@ -176,6 +195,20 @@ function MindNode({ data, selected }: NodeProps) {
 			>
 				{node.title}
 			</div>
+			
+			{/* Collapse/Expand button - shown on hover or when collapsed */}
+			{hasChildren && (isHovered || isCollapsed) && (
+				<div 
+					className="collapse-button"
+					onClick={handleToggleClick}
+					onMouseDown={(e) => e.stopPropagation()}
+				>
+					<div className={`collapse-button-circle ${isCollapsed ? 'collapsed' : ''}`}>
+						{isCollapsed && collapsedCount}
+					</div>
+				</div>
+			)}
+			
 			<Handle
 				type="source"
 				position={Position.Right}
