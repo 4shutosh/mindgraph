@@ -11,6 +11,8 @@ export interface MindNodeData extends Record<string, unknown> {
 	onWidthChange?: (nodeId: string, widthDelta: number) => void;
 	isDragging?: boolean;
 	isDragOver?: boolean;
+	isValidDropTarget?: boolean;
+	isDropTargetHovered?: boolean;
 }
 
 /**
@@ -26,6 +28,8 @@ function MindNode({ data, selected }: NodeProps) {
 		onWidthChange,
 		isDragging,
 		isDragOver,
+		isValidDropTarget,
+		isDropTargetHovered,
 	} = data as MindNodeData;
 	const contentRef = useRef<HTMLDivElement>(null);
 	const originalValueRef = useRef<string>(node.title);
@@ -133,6 +137,8 @@ function MindNode({ data, selected }: NodeProps) {
 				selected ? "selected" : ""
 			} ${isEditing ? "editing" : ""} ${isDragging ? "dragging" : ""} ${
 				isDragOver ? "drag-over" : ""
+			} ${isValidDropTarget ? "drop-target" : ""} ${
+				isDropTargetHovered ? "drop-target-hovered" : ""
 			}`}
 		>
 			{/* Handle positioning: center for root, sides for children */}

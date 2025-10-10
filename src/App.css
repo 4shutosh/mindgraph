@@ -347,3 +347,18 @@ kbd {
 	border-color: #3b82f6;
 	box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
+
+/* Reparenting Drop Target Styles - Balanced Design */
+/* Valid drop targets during reparenting - visible but not overwhelming */
+.mind-node.drop-target {
+	border: 2px dashed #3b82f6 !important;
+	background: rgba(59, 130, 246, 0.05) !important;
+	box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Currently hovered drop target - clear highlight */
+.mind-node.drop-target-hovered {
+	border: 2px solid #3b82f6 !important;
+	background: rgba(59, 130, 246, 0.12) !important;
+	box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2), 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+}
