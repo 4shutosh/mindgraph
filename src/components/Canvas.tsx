@@ -715,7 +715,7 @@ export default function Canvas({
 			panActivationKeyCode="Space"
 			multiSelectionKeyCode="Shift"
 			selectionMode={SelectionMode.Partial}
-			nodesDraggable={true}
+			nodesDraggable={false}
 			elementsSelectable={true}
 			nodesFocusable={true}
 			edgesFocusable={false}

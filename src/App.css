@@ -118,39 +118,33 @@ body {
 	font-weight: 500;
 	color: #1f2937;
 	word-wrap: break-word;
+	word-break: break-word;
+	white-space: pre-wrap;
+	min-width: 20px;
+	max-width: 300px;
 	min-height: 1.5rem;
 	cursor: text;
 	padding: 0;
 	margin: 0;
-	display: inline-block;
-}
-
-.node-title-input {
-	width: auto;
-	min-width: 2ch;
-	max-width: 100%;
-	font-size: 0.95rem;
-	font-weight: 500;
-	color: #1f2937;
-	border: none;
-	border-radius: 0;
-	padding: 0;
-	margin: 0;
 	outline: none;
-	background: transparent;
-	font-family: inherit;
-	display: inline-block;
+	line-height: 1.5rem;
 }
 
-/* Override parent container width when editing */
-.mind-node.editing {
-	min-width: auto !important;
-	width: auto !important;
+/* When contentEditable is active */
+.node-title[contenteditable="true"] {
+	cursor: text;
+	outline: none;
+	user-select: text;
+	-webkit-user-select: text;
+	-moz-user-select: text;
+	-ms-user-select: text;
 }
 
-.mind-node.root-node.editing {
-	min-width: auto !important;
-	width: auto !important;
+/* Ensure consistent appearance in both view and edit modes */
+.node-title:empty::before {
+	content: attr(data-placeholder);
+	color: #9ca3af;
+	pointer-events: none;
 }
 
 /* Control Panel */

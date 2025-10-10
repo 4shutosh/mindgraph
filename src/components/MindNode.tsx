@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useEffect } from "react";
+import { memo, useRef, useEffect } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { TreeNode } from "../types";
 
@@ -12,40 +12,40 @@ export interface MindNodeData extends Record<string, unknown> {
 }
 
 /**
- * Custom node component for the mindgraph with inline editing
+ * Custom node component for the mindgraph with inline editing using contentEditable
  */
 function MindNode({ data, selected }: NodeProps) {
 	const { node, isEditing, isRoot, onStartEdit, onFinishEdit, onCancelEdit } =
 		data as MindNodeData;
-	const [editValue, setEditValue] = useState(node.title);
-	const inputRef = useRef<HTMLInputElement>(null);
+	const contentRef = useRef<HTMLDivElement>(null);
+	const originalValueRef = useRef<string>(node.title);
 
-	// Focus input when editing starts
+	// Focus and select text when editing starts
 	useEffect(() => {
-		if (isEditing && inputRef.current) {
-			inputRef.current.focus();
-			inputRef.current.select();
-		}
-	}, [isEditing]);
+		if (isEditing && contentRef.current) {
+			contentRef.current.focus();
 
-	// Update edit value when node title changes or when editing starts
-	useEffect(() => {
-		setEditValue(node.title);
-	}, [node.title]);
+			// Select all text
+			const range = document.createRange();
+			range.selectNodeContents(contentRef.current);
+			const selection = window.getSelection();
+			if (selection) {
+				selection.removeAllRanges();
+				selection.addRange(range);
+			}
 
-	// Reset edit value when editing starts (for new nodes)
-	useEffect(() => {
-		if (isEditing) {
-			setEditValue(node.title);
+			// Store original value
+			originalValueRef.current = node.title;
 		}
 	}, [isEditing, node.title]);
 
 	const handleFinishEdit = () => {
-		const trimmedValue = editValue.trim();
+		if (!contentRef.current) return;
+		const trimmedValue = contentRef.current.textContent?.trim() || "";
 		onFinishEdit(node.nodeId, trimmedValue);
 	};
 
-	const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+	const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
 		if (e.key === "Enter") {
 			e.preventDefault();
 			e.stopPropagation(); // Prevent event from bubbling to Canvas
@@ -53,17 +53,42 @@ function MindNode({ data, selected }: NodeProps) {
 		} else if (e.key === "Escape") {
 			e.preventDefault();
 			e.stopPropagation(); // Prevent event from bubbling to Canvas
+
+			const currentValue = contentRef.current?.textContent?.trim() || "";
+
 			// If input is empty (including just created nodes), delete the node
-			if (editValue.trim() === "") {
+			if (currentValue === "") {
 				onCancelEdit(node.nodeId);
 			} else {
-				setEditValue(node.title);
-				onFinishEdit(node.nodeId, node.title);
+				// Restore original value
+				if (contentRef.current) {
+					contentRef.current.textContent = originalValueRef.current;
+				}
+				onFinishEdit(node.nodeId, originalValueRef.current);
 			}
 		} else if (e.key === "Tab") {
-			// Allow Tab to work normally in input (for indentation, etc.)
+			// Allow Tab to work normally (will be handled by Canvas)
 			// Don't prevent default or stop propagation
 			return;
+		}
+	};
+
+	const handleInput = () => {
+		// Prevent any newlines from being inserted
+		if (contentRef.current) {
+			const text = contentRef.current.textContent || "";
+			if (text.includes("\n")) {
+				contentRef.current.textContent = text.replace(/\n/g, "");
+				// Move cursor to end
+				const range = document.createRange();
+				const selection = window.getSelection();
+				range.selectNodeContents(contentRef.current);
+				range.collapse(false);
+				if (selection) {
+					selection.removeAllRanges();
+					selection.addRange(range);
+				}
+			}
 		}
 	};
 
@@ -96,24 +121,19 @@ function MindNode({ data, selected }: NodeProps) {
 				}
 			/>
 
-			{isEditing ? (
-				<input
-					ref={inputRef}
-					type="text"
-					className="node-title-input"
-					value={editValue}
-					onChange={(e) => setEditValue(e.target.value)}
-					onBlur={handleFinishEdit}
-					onKeyDown={handleKeyDown}
-				/>
-			) : (
-				<div
-					className="node-title"
-					onDoubleClick={() => onStartEdit(node.nodeId)}
-				>
-					{node.title}
-				</div>
-			)}
+			<div
+				ref={contentRef}
+				className="node-title"
+				contentEditable={isEditing}
+				suppressContentEditableWarning
+				onDoubleClick={() => !isEditing && onStartEdit(node.nodeId)}
+				onBlur={isEditing ? handleFinishEdit : undefined}
+				onKeyDown={isEditing ? handleKeyDown : undefined}
+				onInput={isEditing ? handleInput : undefined}
+				spellCheck={false}
+			>
+				{node.title}
+			</div>
 
 			<Handle
 				type="source"
