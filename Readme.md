@@ -34,6 +34,7 @@ npm run build
 - **Delete/Backspace**: Delete selected nodes and their entire subtrees
 - **Double-click node**: Edit node inline
 - **Click node**: Focus node for keyboard navigation
+- **Drag node**: Rearrange vertical position of sibling nodes
 - **Space + Drag**: Pan the canvas
 - **Click + Drag**: Multi-select nodes (box selection)
 - **Shift + Click**: Add to selection

@@ -21,16 +21,13 @@ import {
 	createNodeInstance,
 	createEdge,
 	getChildrenInstances,
-	getSiblingInstances,
-	calculateSiblingPosition,
-	calculateChildPosition,
 	getAllDescendants,
 	getParentInstance,
 	getFirstChildInstance,
 	getNextSiblingInstance,
 	getPreviousSiblingInstance,
-	updateSiblingPositions,
 } from "../utils/nodeHelpers";
+import { recalculateLayout } from "../utils/layoutHelpers";
 import MindNode, { MindNodeData } from "./MindNode";
 
 const nodeTypes: NodeTypes = {
@@ -61,6 +58,8 @@ export default function Canvas({
 	const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(
 		new Set()
 	);
+	const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+	const [targetDropOrder, setTargetDropOrder] = useState<number | null>(null);
 	const reactFlowInstance = useRef<ReactFlowInstance<
 		Node<MindNodeData>,
 		Edge
@@ -116,20 +115,23 @@ export default function Canvas({
 				}
 			});
 
+			// Recalculate layout for remaining nodes
+			const layoutedInstances = recalculateLayout(
+				remainingInstances,
+				remainingNodes
+			);
+
 			onGraphChange({
 				...graph,
 				nodes: remainingNodes,
-				instances: remainingInstances,
+				instances: layoutedInstances,
 				edges: remainingEdges,
 				focusedInstanceId: null,
 			});
-
 			setEditingInstanceId(null);
 		},
 		[graph, onGraphChange]
-	);
-
-	// Check if a node has any children instances
+	); // Check if a node has any children instances
 	const nodeHasChildren = useCallback(
 		(nodeId: string): boolean => {
 			// Find all instances of this node
@@ -270,11 +272,23 @@ export default function Canvas({
 				const isFocused = instance.instanceId === graph.focusedInstanceId;
 				const isEditing = instance.instanceId === editingInstanceId;
 				const isRoot = instance.parentInstanceId === null;
+				const isDragging = instance.instanceId === draggingNodeId;
+				
+				// Determine if this node is at the target drop position
+				let isDragOver = false;
+				if (draggingNodeId && targetDropOrder !== null) {
+					const draggingInstance = graph.instances.find(i => i.instanceId === draggingNodeId);
+					if (draggingInstance && instance.parentInstanceId === draggingInstance.parentInstanceId) {
+						// Highlight the node that's currently at the target drop position
+						isDragOver = instance.siblingOrder === targetDropOrder;
+					}
+				}
 
 				return {
 					id: instance.instanceId,
 					type: "mindNode",
 					position: instance.position,
+					positionAbsolute: instance.position, // Ensure absolute positioning
 					data: {
 						node: treeNode,
 						isEditing,
@@ -282,9 +296,11 @@ export default function Canvas({
 						onFinishEdit: handleFinishEdit,
 						onCancelEdit: handleCancelEdit,
 						onWidthChange: handleWidthChange,
+						isDragging,
+						isDragOver,
 					},
 					selected: isFocused,
-					draggable: false,
+					draggable: !isEditing && !isRoot, // Allow dragging non-root nodes when not editing
 				};
 			});
 		const flowEdges: Edge[] = graph.edges.map((edge) => ({
@@ -305,6 +321,8 @@ export default function Canvas({
 	}, [
 		graph,
 		editingInstanceId,
+		draggingNodeId,
+		targetDropOrder,
 		handleFinishEdit,
 		handleCancelEdit,
 		handleWidthChange,
@@ -333,9 +351,6 @@ export default function Canvas({
 	// Disable manual edge connections - edges are created automatically
 	const onConnect = useCallback((_connection: Connection) => {
 		// Manual connections disabled - all edges created automatically via Tab/Enter
-		console.log(
-			"Manual edge creation disabled. Use Tab/Enter to create connected nodes."
-		);
 	}, []);
 
 	// Create a sibling node (Enter key)
@@ -348,28 +363,35 @@ export default function Canvas({
 		if (!currentInstance) return;
 
 		const newNode = createNode();
-		const siblings = getSiblingInstances(
-			currentInstance.instanceId,
-			graph.instances
-		);
-		const position = calculateSiblingPosition(currentInstance, siblings);
 
+		// Create new instance with temporary position (will be recalculated)
 		const newInstance = createNodeInstance(
 			newNode.nodeId,
-			position,
+			{ x: 0, y: 0 }, // Temporary position
 			currentInstance.parentInstanceId,
 			currentInstance.depth,
 			currentInstance.siblingOrder + 1 // Insert right after current instance
 		);
 
-		// Update positions of siblings that come after the current one
-		const updatedInstances = updateSiblingPositions(
-			currentInstance,
-			graph.instances
-		);
+		// Update sibling orders for nodes that come after
+		const updatedInstances = graph.instances.map((inst) => {
+			if (
+				inst.parentInstanceId === currentInstance.parentInstanceId &&
+				inst.siblingOrder > currentInstance.siblingOrder
+			) {
+				return { ...inst, siblingOrder: inst.siblingOrder + 1 };
+			}
+			return inst;
+		});
 
 		// Add the new instance
-		const finalInstances = [...updatedInstances, newInstance];
+		const instancesWithNew = [...updatedInstances, newInstance];
+
+		// Apply d3 layout to calculate proper positions
+		const layoutedInstances = recalculateLayout(instancesWithNew, {
+			...graph.nodes,
+			[newNode.nodeId]: newNode,
+		});
 
 		// Create edge from parent to new sibling
 		const newEdges = [...graph.edges];
@@ -382,7 +404,7 @@ export default function Canvas({
 		const updatedGraph: MindGraph = {
 			...graph,
 			nodes: { ...graph.nodes, [newNode.nodeId]: newNode },
-			instances: finalInstances,
+			instances: layoutedInstances,
 			edges: newEdges,
 			rootNodeId: graph.rootNodeId || newNode.nodeId,
 			focusedInstanceId: newInstance.instanceId,
@@ -409,15 +431,24 @@ export default function Canvas({
 			parentInstance.instanceId,
 			graph.instances
 		);
-		const position = calculateChildPosition(parentInstance, existingChildren);
 
+		// Create new instance with temporary position (will be recalculated)
 		const newInstance = createNodeInstance(
 			newNode.nodeId,
-			position,
+			{ x: 0, y: 0 }, // Temporary position
 			parentInstance.instanceId,
 			parentInstance.depth + 1,
 			existingChildren.length
 		);
+
+		// Add the new instance
+		const instancesWithNew = [...graph.instances, newInstance];
+
+		// Apply d3 layout to calculate proper positions
+		const layoutedInstances = recalculateLayout(instancesWithNew, {
+			...graph.nodes,
+			[newNode.nodeId]: newNode,
+		});
 
 		// Create edge from parent to child
 		const newEdge = createEdge(
@@ -428,7 +459,7 @@ export default function Canvas({
 		const updatedGraph: MindGraph = {
 			...graph,
 			nodes: { ...graph.nodes, [newNode.nodeId]: newNode },
-			instances: [...graph.instances, newInstance],
+			instances: layoutedInstances,
 			edges: [...graph.edges, newEdge],
 			focusedInstanceId: newInstance.instanceId,
 		};
@@ -479,7 +510,6 @@ export default function Canvas({
 	// Handle node double-click to start editing
 	const handleNodeDoubleClick = useCallback(
 		(_event: React.MouseEvent, node: Node) => {
-			console.log("Double click detected on node:", node.id);
 			setEditingInstanceId(node.id);
 		},
 		[]
@@ -598,11 +628,17 @@ export default function Canvas({
 			}
 		});
 
+		// Recalculate layout for remaining nodes
+		const layoutedInstances = recalculateLayout(
+			remainingInstances,
+			remainingNodes
+		);
+
 		// Update graph
 		const updatedGraph = {
 			...graph,
 			nodes: remainingNodes,
-			instances: remainingInstances,
+			instances: layoutedInstances,
 			edges: remainingEdges,
 			focusedInstanceId:
 				graph.focusedInstanceId &&
@@ -611,9 +647,7 @@ export default function Canvas({
 					: graph.focusedInstanceId,
 		};
 
-		onGraphChange(updatedGraph);
-
-		// Clear editing state if deleted node was being edited
+		onGraphChange(updatedGraph); // Clear editing state if deleted node was being edited
 		if (editingInstanceId && instancesToDelete.has(editingInstanceId)) {
 			setEditingInstanceId(null);
 		}
@@ -710,6 +744,148 @@ export default function Canvas({
 		editingInstanceId,
 	]);
 
+	// Handle node drag start
+	const handleNodeDragStart = useCallback(
+		(_event: React.MouseEvent, node: Node) => {
+			setDraggingNodeId(node.id);
+			setTargetDropOrder(null);
+		},
+		[]
+	);
+
+	// Handle node drag - determine target drop position
+	const handleNodeDrag = useCallback(
+		(_event: React.MouseEvent, node: Node) => {
+			if (!reactFlowInstance.current || !draggingNodeId) return;
+
+			const draggingInstance = graph.instances.find(
+				(inst) => inst.instanceId === draggingNodeId
+			);
+			if (!draggingInstance) return;
+
+			// Get all siblings (including the dragging node) sorted by their Y position
+			const allSiblings = graph.instances
+				.filter((inst) => inst.parentInstanceId === draggingInstance.parentInstanceId)
+				.map((inst) => {
+					const rfNode = reactFlowInstance.current?.getNode(inst.instanceId);
+					return { instance: inst, yPos: rfNode?.position.y ?? 0 };
+				})
+				.sort((a, b) => a.yPos - b.yPos);
+
+			// Find where the dragged node would be inserted based on its current Y position
+			const draggedY = node.position.y;
+			let newOrder = 0;
+
+			for (let i = 0; i < allSiblings.length; i++) {
+				const sibling = allSiblings[i];
+				
+				// Skip the dragging node itself in the comparison
+				if (sibling.instance.instanceId === draggingNodeId) continue;
+
+				// If dragged position is below this sibling, increment target order
+				if (draggedY > sibling.yPos) {
+					newOrder++;
+				}
+			}
+
+			setTargetDropOrder(newOrder);
+		},
+		[graph.instances, draggingNodeId]
+	);
+
+	// Handle node drag stop - reorder siblings if needed
+	const handleNodeDragStop = useCallback(
+		(_event: React.MouseEvent, _node: Node) => {
+			if (!draggingNodeId || targetDropOrder === null) {
+				setDraggingNodeId(null);
+				setTargetDropOrder(null);
+				return;
+			}
+
+			const draggingInstance = graph.instances.find(
+				(inst) => inst.instanceId === draggingNodeId
+			);
+
+			if (!draggingInstance) {
+				setDraggingNodeId(null);
+				setTargetDropOrder(null);
+				return;
+			}
+
+			const oldOrder = draggingInstance.siblingOrder;
+			const newOrder = targetDropOrder;
+
+			// Clear drag state
+			setDraggingNodeId(null);
+			setTargetDropOrder(null);
+
+			// No change needed
+			if (oldOrder === newOrder) {
+				return;
+			}
+
+			console.log('🔄 Reordering:', {
+				node: graph.nodes[draggingInstance.nodeId]?.title,
+				from: oldOrder,
+				to: newOrder
+			});
+
+			// Update sibling orders - simple approach
+			const updatedInstances = graph.instances.map((inst) => {
+				// Only affect siblings of the same parent
+				if (inst.parentInstanceId !== draggingInstance.parentInstanceId) {
+					return inst;
+				}
+
+				// The dragged node gets the new order
+				if (inst.instanceId === draggingInstance.instanceId) {
+					return { ...inst, siblingOrder: newOrder };
+				}
+
+				// Adjust other siblings' orders
+				const currentOrder = inst.siblingOrder;
+				
+				if (oldOrder < newOrder) {
+					// Moving down: shift nodes between old and new position up
+					if (currentOrder > oldOrder && currentOrder <= newOrder) {
+						return { ...inst, siblingOrder: currentOrder - 1 };
+					}
+				} else {
+					// Moving up: shift nodes between new and old position down
+					if (currentOrder >= newOrder && currentOrder < oldOrder) {
+						return { ...inst, siblingOrder: currentOrder + 1 };
+					}
+				}
+
+				return inst;
+			});
+
+			// Recalculate layout
+			const layoutedInstances = recalculateLayout(
+				updatedInstances,
+				graph.nodes
+			);
+
+			console.log('✅ New order:', 
+				layoutedInstances
+					.filter(i => i.parentInstanceId === draggingInstance.parentInstanceId)
+					.sort((a, b) => a.siblingOrder - b.siblingOrder)
+					.map(i => ({ 
+						order: i.siblingOrder,
+						title: graph.nodes[i.nodeId]?.title,
+					}))
+			);
+
+			// Update graph
+			onGraphChange({
+				...graph,
+				instances: layoutedInstances,
+				focusedInstanceId: null, // Clear focus after drag operation
+			});
+		},
+		[graph, draggingNodeId, targetDropOrder, onGraphChange]
+	);
+
 	return (
 		<ReactFlow
 			nodes={nodes}
@@ -719,6 +895,9 @@ export default function Canvas({
 			onConnect={onConnect}
 			onNodeClick={handleNodeClick}
 			onNodeDoubleClick={handleNodeDoubleClick}
+			onNodeDragStart={handleNodeDragStart}
+			onNodeDrag={handleNodeDrag}
+			onNodeDragStop={handleNodeDragStop}
 			onSelectionChange={handleSelectionChange}
 			onInit={onInit}
 			nodeTypes={nodeTypes}

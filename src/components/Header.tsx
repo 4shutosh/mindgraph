@@ -2,15 +2,10 @@ import React from "react";
 
 interface HeaderProps {
 	onNewNode: () => void;
-	onAutoAlign: () => void;
 	onToggleShortcuts: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({
-	onNewNode,
-	onAutoAlign,
-	onToggleShortcuts,
-}) => {
+const Header: React.FC<HeaderProps> = ({ onNewNode, onToggleShortcuts }) => {
 	return (
 		<header className="app-header">
 			<div className="flex flex-col header-left">
@@ -23,13 +18,6 @@ const Header: React.FC<HeaderProps> = ({
 				<div className="button-group">
 					<button className="btn btn-primary" onClick={onNewNode}>
 						+ New Root Node
-					</button>
-					<button
-						className="btn btn-secondary"
-						onClick={onAutoAlign}
-						title="Auto-align and balance tree layout"
-					>
-						⚡ Auto-align
 					</button>
 				</div>
 				{/* <div className="button-group history-buttons">

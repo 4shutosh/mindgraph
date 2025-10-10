@@ -1,139 +1,177 @@
-import { NodeInstance } from "../types";
+import { hierarchy, cluster, HierarchyPointNode } from "d3-hierarchy";
+import { NodeInstance, TreeNode } from "../types";
 
 /**
- * Auto-layout configuration
+ * Layout configuration
  */
 const LAYOUT_CONFIG = {
-	horizontalSpacing: 140, // Distance between parent and child (left to right)
-	verticalSpacing: 80, // Distance between siblings (top to bottom)
-	startX: 100, // Starting X position for root nodes
-	startY: 100, // Starting Y position for root nodes
+	horizontalSpacing: 200,
+	verticalSpacing: 75,
+	startX: 100,
+	startY: 100,
+	nodeMaxWidth: 300, // Match CSS max-width
+	lineHeight: 24, // Match CSS line-height (1.5rem)
+	basePadding: 20, // Base padding for node (12px top + 12px bottom + some margin)
 };
 
+interface HierarchyNode {
+	instanceId: string;
+	instance: NodeInstance;
+	nodeData: TreeNode;
+	estimatedHeight: number;
+	children?: HierarchyNode[];
+}
+
 /**
- * Calculate balanced positions for all nodes in the tree
+ * Estimate node height based on text content
+ * This accounts for word wrapping within the max-width constraint
  */
-export function calculateBalancedLayout(
-	instances: NodeInstance[]
-): Map<string, { x: number; y: number }> {
+function estimateNodeHeight(text: string): number {
+	if (!text || text.trim().length === 0) {
+		return LAYOUT_CONFIG.lineHeight + LAYOUT_CONFIG.basePadding;
+	}
+
+	// More accurate character width estimation
+	const avgCharWidth = 10; // Increased to account for padding and varied characters
+	const maxCharsPerLine = Math.floor(LAYOUT_CONFIG.nodeMaxWidth / avgCharWidth);
+
+	// Split by words to handle word wrapping properly
+	const words = text.split(/\s+/);
+	let lines = 1;
+	let currentLineLength = 0;
+
+	for (const word of words) {
+		const wordLength = word.length;
+
+		// If adding this word would exceed the line, start a new line
+		if (
+			currentLineLength + wordLength + 1 > maxCharsPerLine &&
+			currentLineLength > 0
+		) {
+			lines++;
+			currentLineLength = wordLength;
+		} else {
+			currentLineLength += wordLength + 1; // +1 for space
+		}
+	}
+
+	// Height = (number of lines * line height) + padding
+	// Add significantly more padding for multi-line nodes
+	const extraPadding = lines > 1 ? 20 : 0;
+	const minHeight = LAYOUT_CONFIG.lineHeight + LAYOUT_CONFIG.basePadding;
+
+	return Math.max(
+		lines * LAYOUT_CONFIG.lineHeight + LAYOUT_CONFIG.basePadding + extraPadding,
+		minHeight
+	);
+}
+
+/**
+ * Build hierarchical tree structure from flat instance array
+ */
+function buildHierarchyTree(
+	instances: NodeInstance[],
+	nodes: Record<string, TreeNode>
+): HierarchyNode[] {
+	const rootInstances = instances.filter(
+		(inst) => inst.parentInstanceId === null
+	);
+
+	function buildNode(instance: NodeInstance): HierarchyNode {
+		const nodeData = nodes[instance.nodeId];
+		const estimatedHeight = estimateNodeHeight(nodeData?.title || "");
+
+		const children = instances
+			.filter((inst) => inst.parentInstanceId === instance.instanceId)
+			.sort((a, b) => a.siblingOrder - b.siblingOrder)
+			.map((child) => buildNode(child));
+
+		return {
+			instanceId: instance.instanceId,
+			instance,
+			nodeData,
+			estimatedHeight,
+			children: children.length > 0 ? children : undefined,
+		};
+	}
+
+	return rootInstances
+		.sort((a, b) => a.siblingOrder - b.siblingOrder)
+		.map((root) => buildNode(root));
+}
+
+/**
+ * Apply d3 cluster layout to instances
+ */
+export function applyBalancedLayout(
+	instances: NodeInstance[],
+	nodes: Record<string, TreeNode>
+): NodeInstance[] {
+	if (instances.length === 0) {
+		return instances;
+	}
+
 	const positions = new Map<string, { x: number; y: number }>();
+	const trees = buildHierarchyTree(instances, nodes);
+	let currentOffsetY = LAYOUT_CONFIG.startY;
 
-	// Find root nodes (no parent) and sort by sibling order
-	const rootNodes = instances
-		.filter((inst) => inst.parentInstanceId === null)
-		.sort((a, b) => a.siblingOrder - b.siblingOrder);
+	trees.forEach((tree) => {
+		const root = hierarchy<HierarchyNode>(tree, (d) => d.children);
 
-	// Group nodes by depth level
-	const nodesByDepth = new Map<number, NodeInstance[]>();
-	instances.forEach((inst) => {
-		const existing = nodesByDepth.get(inst.depth) || [];
-		nodesByDepth.set(inst.depth, [...existing, inst]);
-	});
-
-	// Position root nodes vertically with proper spacing
-	let currentY = LAYOUT_CONFIG.startY;
-
-	rootNodes.forEach((root) => {
-		positions.set(root.instanceId, {
-			x: LAYOUT_CONFIG.startX,
-			y: currentY,
+		// Count nodes to determine reasonable tree height
+		let nodeCount = 0;
+		let maxHeight = 0;
+		root.each((node) => {
+			nodeCount++;
+			maxHeight = Math.max(maxHeight, node.data.estimatedHeight);
 		});
 
-		// Recursively position children and get bounds
-		const bounds = positionChildren(root, instances, positions);
+		// Much more compact tree height calculation
+		const treeHeight = nodeCount * (maxHeight + 20); // Just node height + small gap
 
-		// Next root starts after this subtree with spacing
-		currentY = bounds.maxY + LAYOUT_CONFIG.verticalSpacing * 2;
-	});
+		const clusterLayout = cluster<HierarchyNode>()
+			.size([treeHeight, 1000])
+			.separation((a, b) => {
+				// Calculate separation based on the actual heights of the nodes
+				const aHeight = a.data.estimatedHeight;
+				const bHeight = b.data.estimatedHeight;
+				const avgHeight = (aHeight + bHeight) / 2;
+				const baseHeight = LAYOUT_CONFIG.lineHeight + LAYOUT_CONFIG.basePadding;
 
-	return positions;
-}
+				// Use actual height to determine separation
+				// This ensures nodes with more text get more spacing
+				const heightFactor = avgHeight / baseHeight;
 
-/**
- * Recursively position children of a node
- * Returns the min and max Y positions of the subtree
- */
-function positionChildren(
-	parent: NodeInstance,
-	allInstances: NodeInstance[],
-	positions: Map<string, { x: number; y: number }>
-): { minY: number; maxY: number } {
-	// Find children of this parent and sort by sibling order
-	const children = allInstances
-		.filter((inst) => inst.parentInstanceId === parent.instanceId)
-		.sort((a, b) => a.siblingOrder - b.siblingOrder);
-
-	if (children.length === 0) {
-		const parentPos = positions.get(parent.instanceId);
-		if (!parentPos) return { minY: 0, maxY: 0 };
-		return { minY: parentPos.y, maxY: parentPos.y };
-	}
-
-	const parentPos = positions.get(parent.instanceId);
-	if (!parentPos) return { minY: 0, maxY: 0 };
-
-	const childX = parentPos.x + LAYOUT_CONFIG.horizontalSpacing;
-
-	// First pass: position children and get their subtree bounds
-	const childBounds: { minY: number; maxY: number }[] = [];
-	let nextY = parentPos.y;
-
-	children.forEach((child, index) => {
-		// Position child
-		positions.set(child.instanceId, {
-			x: childX,
-			y: nextY,
-		});
-
-		// Recursively position child's children and get bounds
-		const bounds = positionChildren(child, allInstances, positions);
-		childBounds.push(bounds);
-
-		// Calculate next Y position for sibling
-		if (index < children.length - 1) {
-			nextY = bounds.maxY + LAYOUT_CONFIG.verticalSpacing;
-		}
-	});
-
-	// Second pass: adjust parent to center of children
-	if (children.length > 0) {
-		const firstChildPos = positions.get(children[0].instanceId);
-		const lastChildPos = positions.get(
-			children[children.length - 1].instanceId
-		);
-
-		if (firstChildPos && lastChildPos) {
-			const centerY = (firstChildPos.y + lastChildPos.y) / 2;
-			positions.set(parent.instanceId, {
-				x: parentPos.x,
-				y: centerY,
+				// Adjusted spacing that scales better with node height
+				return a.parent === b.parent
+					? 0.8 * heightFactor // Siblings: scale with height
+					: 0.9 * heightFactor; // Cousins: slightly more spacing
 			});
-		}
-	}
 
-	// Return the bounds of this subtree
-	const allYs = [parentPos.y, ...childBounds.flatMap((b) => [b.minY, b.maxY])];
+		const layoutRoot = clusterLayout(root);
 
-	return {
-		minY: Math.min(...allYs),
-		maxY: Math.max(...allYs),
-	};
-}
+		layoutRoot.each((node: HierarchyPointNode<HierarchyNode>) => {
+			positions.set(node.data.instanceId, {
+				x: LAYOUT_CONFIG.startX + node.depth * LAYOUT_CONFIG.horizontalSpacing,
+				y: node.x + currentOffsetY,
+			});
+		});
 
-/**
- * Apply balanced layout positions to instances
- */
-export function applyBalancedLayout(instances: NodeInstance[]): NodeInstance[] {
-	const positions = calculateBalancedLayout(instances);
+		currentOffsetY += treeHeight + LAYOUT_CONFIG.verticalSpacing * 2;
+	});
 
 	return instances.map((instance) => {
 		const newPos = positions.get(instance.instanceId);
-		if (newPos) {
-			return {
-				...instance,
-				position: newPos,
-			};
-		}
-		return instance;
+		return newPos ? { ...instance, position: newPos } : instance;
 	});
+}
+
+/**
+ * Recalculate layout after graph modifications
+ */
+export function recalculateLayout(
+	instances: NodeInstance[],
+	nodes: Record<string, TreeNode>
+): NodeInstance[] {
+	return applyBalancedLayout(instances, nodes);
 }

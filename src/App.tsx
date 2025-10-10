@@ -6,7 +6,6 @@ import { MindGraph } from "./types";
 import { loadGraph, saveGraph, createEmptyGraph } from "./utils/storage";
 import { useHistory } from "./utils/useHistory";
 import { createNode, createNodeInstance } from "./utils/nodeHelpers";
-import { applyBalancedLayout } from "./utils/layoutHelpers";
 import "./App.css";
 
 function App() {
@@ -73,15 +72,6 @@ function App() {
 		}
 	}, [instanceToEdit]);
 
-	// Apply auto-layout to balance the tree
-	const handleAutoAlign = useCallback(() => {
-		const balancedInstances = applyBalancedLayout(graph.instances);
-		handleGraphChange({
-			...graph,
-			instances: balancedInstances,
-		});
-	}, [graph, handleGraphChange]);
-
 	// Keyboard shortcuts for undo/redo
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -121,7 +111,6 @@ function App() {
 		<div className="app">
 			<Header
 				onNewNode={handleCreateNode}
-				onAutoAlign={handleAutoAlign}
 				onToggleShortcuts={() => setIsShortcutsModalOpen(true)}
 			/>
 

@@ -100,10 +100,15 @@ body {
 	border: 2px solid transparent;
 	border-radius: 8px;
 	padding: 4px;
+	cursor: grab;
 }
 
 .mind-node.child-node:hover {
 	background: rgba(0, 0, 0, 0.02);
+}
+
+.mind-node.child-node:active {
+	cursor: grabbing;
 }
 
 /* Selected state shows border for all nodes */
@@ -111,6 +116,19 @@ body {
 	border-color: #3b82f6 !important;
 	background: white;
 	box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+}
+
+/* Dragging state - show visual feedback */
+.mind-node.dragging {
+	opacity: 0.5;
+	cursor: grabbing !important;
+}
+
+/* Drag over state - show drop target */
+.mind-node.drag-over {
+	border-color: #10b981 !important;
+	background: rgba(16, 185, 129, 0.1);
+	box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
 }
 
 .node-title {
