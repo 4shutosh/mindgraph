@@ -30,16 +30,20 @@ export function calculateBalancedLayout(
 		nodesByDepth.set(inst.depth, [...existing, inst]);
 	});
 
-	// Position root nodes vertically
-	rootNodes.forEach((root, index) => {
-		const y = LAYOUT_CONFIG.startY + index * LAYOUT_CONFIG.verticalSpacing;
+	// Position root nodes vertically with proper spacing
+	let currentY = LAYOUT_CONFIG.startY;
+
+	rootNodes.forEach((root) => {
 		positions.set(root.instanceId, {
 			x: LAYOUT_CONFIG.startX,
-			y,
+			y: currentY,
 		});
 
-		// Recursively position children
-		positionChildren(root, instances, positions);
+		// Recursively position children and get bounds
+		const bounds = positionChildren(root, instances, positions);
+
+		// Next root starts after this subtree with spacing
+		currentY = bounds.maxY + LAYOUT_CONFIG.verticalSpacing * 2;
 	});
 
 	return positions;
@@ -47,58 +51,73 @@ export function calculateBalancedLayout(
 
 /**
  * Recursively position children of a node
+ * Returns the min and max Y positions of the subtree
  */
 function positionChildren(
 	parent: NodeInstance,
 	allInstances: NodeInstance[],
 	positions: Map<string, { x: number; y: number }>
-): void {
+): { minY: number; maxY: number } {
 	// Find children of this parent and sort by sibling order
 	const children = allInstances
 		.filter((inst) => inst.parentInstanceId === parent.instanceId)
 		.sort((a, b) => a.siblingOrder - b.siblingOrder);
 
-	if (children.length === 0) return;
+	if (children.length === 0) {
+		const parentPos = positions.get(parent.instanceId);
+		if (!parentPos) return { minY: 0, maxY: 0 };
+		return { minY: parentPos.y, maxY: parentPos.y };
+	}
 
 	const parentPos = positions.get(parent.instanceId);
-	if (!parentPos) return;
+	if (!parentPos) return { minY: 0, maxY: 0 };
 
-	// Calculate child positions
 	const childX = parentPos.x + LAYOUT_CONFIG.horizontalSpacing;
 
-	// Position children vertically centered around parent
-	const totalHeight = (children.length - 1) * LAYOUT_CONFIG.verticalSpacing;
-	const startY = parentPos.y - totalHeight / 2;
+	// First pass: position children and get their subtree bounds
+	const childBounds: { minY: number; maxY: number }[] = [];
+	let nextY = parentPos.y;
 
 	children.forEach((child, index) => {
-		const childY = startY + index * LAYOUT_CONFIG.verticalSpacing;
+		// Position child
 		positions.set(child.instanceId, {
 			x: childX,
-			y: childY,
+			y: nextY,
 		});
 
-		// Recursively position this child's children
-		positionChildren(child, allInstances, positions);
+		// Recursively position child's children and get bounds
+		const bounds = positionChildren(child, allInstances, positions);
+		childBounds.push(bounds);
+
+		// Calculate next Y position for sibling
+		if (index < children.length - 1) {
+			nextY = bounds.maxY + LAYOUT_CONFIG.verticalSpacing;
+		}
 	});
 
-	// Adjust parent position to center of children
+	// Second pass: adjust parent to center of children
 	if (children.length > 0) {
-		const childPositions = children
-			.map((c) => positions.get(c.instanceId))
-			.filter((p) => p !== undefined);
+		const firstChildPos = positions.get(children[0].instanceId);
+		const lastChildPos = positions.get(
+			children[children.length - 1].instanceId
+		);
 
-		if (childPositions.length > 0) {
-			const avgChildY =
-				childPositions.reduce((sum, p) => sum + p!.y, 0) /
-				childPositions.length;
-
-			// Update parent Y to align with center of children
+		if (firstChildPos && lastChildPos) {
+			const centerY = (firstChildPos.y + lastChildPos.y) / 2;
 			positions.set(parent.instanceId, {
 				x: parentPos.x,
-				y: avgChildY,
+				y: centerY,
 			});
 		}
 	}
+
+	// Return the bounds of this subtree
+	const allYs = [parentPos.y, ...childBounds.flatMap((b) => [b.minY, b.maxY])];
+
+	return {
+		minY: Math.min(...allYs),
+		maxY: Math.max(...allYs),
+	};
 }
 
 /**

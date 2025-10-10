@@ -73,11 +73,6 @@ export default function Canvas({
 		}
 	}, [instanceToEditId]);
 
-	// Start editing a node
-	const handleStartEdit = useCallback((instanceId: string) => {
-		setEditingInstanceId(instanceId);
-	}, []);
-
 	// Delete node and all its instances/edges
 	const deleteNode = useCallback(
 		(nodeId: string) => {
@@ -153,9 +148,49 @@ export default function Canvas({
 		[graph.instances]
 	);
 
+	// Handle real-time width changes while editing
+	const handleWidthChange = useCallback(
+		(_nodeId: string, widthDelta: number) => {
+			if (!editingInstanceId || widthDelta === 0) return;
+
+			const editingInstance = graph.instances.find(
+				(inst) => inst.instanceId === editingInstanceId
+			);
+			if (!editingInstance) return;
+
+			// Get all descendants
+			const descendants = getAllDescendants(
+				editingInstance.instanceId,
+				graph.instances
+			);
+			const descendantIds = new Set(descendants.map((d) => d.instanceId));
+
+			// Update positions of all descendants
+			const updatedInstances = graph.instances.map((instance) => {
+				if (descendantIds.has(instance.instanceId)) {
+					return {
+						...instance,
+						position: {
+							...instance.position,
+							x: instance.position.x + widthDelta,
+						},
+					};
+				}
+				return instance;
+			});
+
+			// Update the graph with new positions
+			onGraphChange({
+				...graph,
+				instances: updatedInstances,
+			});
+		},
+		[editingInstanceId, graph, onGraphChange]
+	);
+
 	// Finish editing and save changes
 	const handleFinishEdit = useCallback(
-		(nodeId: string, newTitle: string) => {
+		(nodeId: string, newTitle: string, _widthDelta: number = 0) => {
 			// If title is empty, only delete if node has no children
 			if (newTitle.trim() === "") {
 				if (!nodeHasChildren(nodeId)) {
@@ -244,15 +279,14 @@ export default function Canvas({
 						node: treeNode,
 						isEditing,
 						isRoot,
-						onStartEdit: () => handleStartEdit(instance.instanceId),
 						onFinishEdit: handleFinishEdit,
 						onCancelEdit: handleCancelEdit,
+						onWidthChange: handleWidthChange,
 					},
 					selected: isFocused,
-					draggable: true,
+					draggable: false,
 				};
 			});
-
 		const flowEdges: Edge[] = graph.edges.map((edge) => ({
 			id: edge.id,
 			source: edge.source,
@@ -271,13 +305,12 @@ export default function Canvas({
 	}, [
 		graph,
 		editingInstanceId,
-		handleStartEdit,
 		handleFinishEdit,
 		handleCancelEdit,
+		handleWidthChange,
 		setNodes,
 		setEdges,
 	]);
-
 	useEffect(() => {
 		syncGraphToFlow();
 	}, [syncGraphToFlow]);
@@ -296,35 +329,6 @@ export default function Canvas({
 			}
 		}
 	}, [editingInstanceId]);
-
-	// Update graph when nodes are moved
-	const handleNodesChange = useCallback(
-		(changes: any) => {
-			onNodesChange(changes);
-
-			// Update positions in graph
-			const positionChanges = changes.filter(
-				(c: any) => c.type === "position" && c.position
-			);
-			if (positionChanges.length > 0) {
-				const updatedInstances = graph.instances.map((instance) => {
-					const change = positionChanges.find(
-						(c: any) => c.id === instance.instanceId
-					);
-					if (change && change.position) {
-						return { ...instance, position: change.position };
-					}
-					return instance;
-				});
-
-				onGraphChange({
-					...graph,
-					instances: updatedInstances,
-				});
-			}
-		},
-		[graph, onGraphChange, onNodesChange]
-	);
 
 	// Disable manual edge connections - edges are created automatically
 	const onConnect = useCallback((_connection: Connection) => {
@@ -445,9 +449,16 @@ export default function Canvas({
 		[]
 	);
 
-	// Handle node click to focus
+	// Handle node click to focus (or edit if already focused)
 	const handleNodeClick = useCallback(
 		(_event: React.MouseEvent, node: Node) => {
+			// If clicking on already focused node, enter edit mode
+			if (graph.focusedInstanceId === node.id) {
+				setEditingInstanceId(node.id);
+				return;
+			}
+
+			// Otherwise, just focus the node
 			onGraphChange({
 				...graph,
 				focusedInstanceId: node.id,
@@ -463,6 +474,15 @@ export default function Canvas({
 			});
 		},
 		[graph, onGraphChange]
+	);
+
+	// Handle node double-click to start editing
+	const handleNodeDoubleClick = useCallback(
+		(_event: React.MouseEvent, node: Node) => {
+			console.log("Double click detected on node:", node.id);
+			setEditingInstanceId(node.id);
+		},
+		[]
 	);
 
 	// Handle ReactFlow initialization
@@ -694,10 +714,11 @@ export default function Canvas({
 		<ReactFlow
 			nodes={nodes}
 			edges={edges}
-			onNodesChange={handleNodesChange}
+			onNodesChange={onNodesChange}
 			onEdgesChange={onEdgesChange}
 			onConnect={onConnect}
 			onNodeClick={handleNodeClick}
+			onNodeDoubleClick={handleNodeDoubleClick}
 			onSelectionChange={handleSelectionChange}
 			onInit={onInit}
 			nodeTypes={nodeTypes}
@@ -716,6 +737,7 @@ export default function Canvas({
 			multiSelectionKeyCode="Shift"
 			selectionMode={SelectionMode.Partial}
 			nodesDraggable={false}
+			nodesConnectable={false}
 			elementsSelectable={true}
 			nodesFocusable={true}
 			edgesFocusable={false}

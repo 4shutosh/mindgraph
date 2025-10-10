@@ -6,23 +6,26 @@ export interface MindNodeData extends Record<string, unknown> {
 	node: TreeNode;
 	isEditing: boolean;
 	isRoot: boolean;
-	onStartEdit: (nodeId: string) => void;
-	onFinishEdit: (nodeId: string, newTitle: string) => void;
+	onFinishEdit: (nodeId: string, newTitle: string, widthDelta: number) => void;
 	onCancelEdit: (nodeId: string) => void;
+	onWidthChange?: (nodeId: string, widthDelta: number) => void;
 }
 
 /**
  * Custom node component for the mindgraph with inline editing using contentEditable
  */
 function MindNode({ data, selected }: NodeProps) {
-	const { node, isEditing, isRoot, onStartEdit, onFinishEdit, onCancelEdit } =
+	const { node, isEditing, isRoot, onFinishEdit, onCancelEdit, onWidthChange } =
 		data as MindNodeData;
 	const contentRef = useRef<HTMLDivElement>(null);
 	const originalValueRef = useRef<string>(node.title);
+	const initialWidthRef = useRef<number>(0);
+	const nodeRef = useRef<HTMLDivElement>(null);
+	const currentWidthRef = useRef<number>(0);
 
 	// Focus and select text when editing starts
 	useEffect(() => {
-		if (isEditing && contentRef.current) {
+		if (isEditing && contentRef.current && nodeRef.current) {
 			contentRef.current.focus();
 
 			// Select all text
@@ -34,15 +37,25 @@ function MindNode({ data, selected }: NodeProps) {
 				selection.addRange(range);
 			}
 
-			// Store original value
+			// Store original value and initial width
 			originalValueRef.current = node.title;
+			initialWidthRef.current = nodeRef.current.offsetWidth;
+			currentWidthRef.current = nodeRef.current.offsetWidth;
 		}
 	}, [isEditing, node.title]);
 
 	const handleFinishEdit = () => {
-		if (!contentRef.current) return;
+		if (!contentRef.current || !nodeRef.current) return;
 		const trimmedValue = contentRef.current.textContent?.trim() || "";
-		onFinishEdit(node.nodeId, trimmedValue);
+
+		// Calculate width delta after a small delay to ensure DOM has updated
+		setTimeout(() => {
+			if (nodeRef.current) {
+				const finalWidth = nodeRef.current.offsetWidth;
+				const widthDelta = finalWidth - initialWidthRef.current;
+				onFinishEdit(node.nodeId, trimmedValue, widthDelta);
+			}
+		}, 0);
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -60,11 +73,11 @@ function MindNode({ data, selected }: NodeProps) {
 			if (currentValue === "") {
 				onCancelEdit(node.nodeId);
 			} else {
-				// Restore original value
+				// Restore original value - no width change since we're reverting
 				if (contentRef.current) {
 					contentRef.current.textContent = originalValueRef.current;
 				}
-				onFinishEdit(node.nodeId, originalValueRef.current);
+				onFinishEdit(node.nodeId, originalValueRef.current, 0);
 			}
 		} else if (e.key === "Tab") {
 			// Allow Tab to work normally (will be handled by Canvas)
@@ -90,10 +103,22 @@ function MindNode({ data, selected }: NodeProps) {
 				}
 			}
 		}
+
+		// Track width changes in real-time
+		if (nodeRef.current && onWidthChange) {
+			const newWidth = nodeRef.current.offsetWidth;
+			const widthDelta = newWidth - currentWidthRef.current;
+
+			if (widthDelta !== 0) {
+				currentWidthRef.current = newWidth;
+				onWidthChange(node.nodeId, widthDelta);
+			}
+		}
 	};
 
 	return (
 		<div
+			ref={nodeRef}
 			className={`mind-node ${isRoot ? "root-node" : "child-node"} ${
 				selected ? "selected" : ""
 			} ${isEditing ? "editing" : ""}`}
@@ -126,7 +151,6 @@ function MindNode({ data, selected }: NodeProps) {
 				className="node-title"
 				contentEditable={isEditing}
 				suppressContentEditableWarning
-				onDoubleClick={() => !isEditing && onStartEdit(node.nodeId)}
 				onBlur={isEditing ? handleFinishEdit : undefined}
 				onKeyDown={isEditing ? handleKeyDown : undefined}
 				onInput={isEditing ? handleInput : undefined}
@@ -134,7 +158,6 @@ function MindNode({ data, selected }: NodeProps) {
 			>
 				{node.title}
 			</div>
-
 			<Handle
 				type="source"
 				position={Position.Right}
