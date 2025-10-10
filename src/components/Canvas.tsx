@@ -283,12 +283,72 @@ export default function Canvas({
 		[graph.nodes, deleteNode, nodeHasChildren]
 	);
 
+	// Toggle collapse/expand of a subtree
+	const handleToggleCollapse = useCallback(
+		(instanceId: string) => {
+			const targetInstance = graph.instances.find(
+				(inst) => inst.instanceId === instanceId
+			);
+			if (!targetInstance) return;
+
+			// Toggle the collapsed state
+			const updatedInstances = graph.instances.map((inst) => {
+				if (inst.instanceId === targetInstance.instanceId) {
+					return {
+						...inst,
+						isCollapsed: !inst.isCollapsed,
+					};
+				}
+				return inst;
+			});
+
+			// Recalculate layout with new collapsed state
+			const layoutedInstances = recalculateLayout(
+				updatedInstances,
+				graph.nodes
+			);
+
+			onGraphChange({
+				...graph,
+				instances: layoutedInstances,
+			});
+		},
+		[graph, onGraphChange]
+	);
+
 	// Convert graph data to React Flow format
 	const syncGraphToFlow = useCallback(() => {
+		// Helper: Get all instances that should be hidden (descendants of collapsed nodes)
+		const getHiddenInstanceIds = (): Set<string> => {
+			const hidden = new Set<string>();
+			graph.instances.forEach((instance) => {
+				if (instance.isCollapsed) {
+					// Hide all descendants of this collapsed node
+					const descendants = getAllDescendants(
+						instance.instanceId,
+						graph.instances
+					);
+					descendants.forEach((desc) => hidden.add(desc.instanceId));
+				}
+			});
+			return hidden;
+		};
+
+		// Helper: Count descendants for collapsed nodes
+		const countDescendants = (instanceId: string): number => {
+			const descendants = getAllDescendants(instanceId, graph.instances);
+			return descendants.length;
+		};
+
+		const hiddenInstanceIds = getHiddenInstanceIds();
+
 		const flowNodes: Node<MindNodeData>[] = graph.instances
 			.filter((instance) => {
-				// Only include instances that have a valid node
-				return graph.nodes[instance.nodeId] !== undefined;
+				// Only include instances that have a valid node and are not hidden
+				return (
+					graph.nodes[instance.nodeId] !== undefined &&
+					!hiddenInstanceIds.has(instance.instanceId)
+				);
 			})
 			.map((instance) => {
 				const treeNode = graph.nodes[instance.nodeId];
@@ -296,6 +356,10 @@ export default function Canvas({
 				const isEditing = instance.instanceId === editingInstanceId;
 				const isRoot = instance.parentInstanceId === null;
 				const isDragging = instance.instanceId === draggingNodeId;
+				const isCollapsed = instance.isCollapsed || false;
+				const collapsedCount = isCollapsed
+					? countDescendants(instance.instanceId)
+					: 0;
 
 				// Determine if this node is at the target drop position (for vertical reordering)
 				let isDragOver = false;
@@ -329,6 +393,10 @@ export default function Canvas({
 					isValidDropTarget && instance.instanceId === potentialDropParentId
 				);
 
+				// Check if this node has children
+				const hasChildren =
+					getChildrenInstances(instance.instanceId, graph.instances).length > 0;
+
 				return {
 					id: instance.instanceId,
 					type: "mindNode",
@@ -345,23 +413,36 @@ export default function Canvas({
 						isDragOver,
 						isValidDropTarget,
 						isDropTargetHovered,
+						isCollapsed,
+						collapsedCount,
+						hasChildren,
+						onToggleCollapse: handleToggleCollapse,
 					},
 					selected: isFocused,
 					draggable: !isEditing && !isRoot, // Allow dragging non-root nodes when not editing
 				};
 			});
-		const flowEdges: Edge[] = graph.edges.map((edge) => ({
-			id: edge.id,
-			source: edge.source,
-			target: edge.target,
-			type: "default",
-			animated: false,
-			selectable: false,
-			focusable: false,
-			deletable: false,
-			interactable: false,
-			style: { pointerEvents: "none" },
-		}));
+		
+		const flowEdges: Edge[] = graph.edges
+			.filter((edge) => {
+				// Filter out edges to hidden nodes
+				return (
+					!hiddenInstanceIds.has(edge.source) &&
+					!hiddenInstanceIds.has(edge.target)
+				);
+			})
+			.map((edge) => ({
+				id: edge.id,
+				source: edge.source,
+				target: edge.target,
+				type: "default",
+				animated: false,
+				selectable: false,
+				focusable: false,
+				deletable: false,
+				interactable: false,
+				style: { pointerEvents: "none" },
+			}));
 
 		// Add ghost edge preview during reparenting - balanced visibility
 		if (isDraggingForReparent && potentialDropParentId && draggingNodeId) {
@@ -397,6 +478,7 @@ export default function Canvas({
 		handleFinishEdit,
 		handleCancelEdit,
 		handleWidthChange,
+		handleToggleCollapse,
 		setNodes,
 		setEdges,
 	]);

@@ -133,6 +133,57 @@ body {
 	box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
 }
 
+/* Collapsed node styling */
+.mind-node.collapsed {
+	position: relative;
+}
+
+/* Collapse/Expand button on node */
+.collapse-button {
+	position: absolute;
+	right: -18px;
+	top: 50%;
+	transform: translateY(-50%);
+	z-index: 100;
+	cursor: pointer;
+	pointer-events: all;
+	padding-left: 6px;
+}
+
+.collapse-button-circle {
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: white;
+	border: 2px solid #d1d5db;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 9px;
+	font-weight: 600;
+	color: #6b7280;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+	transition: all 0.2s ease;
+}
+
+.collapse-button-circle:hover {
+	border-color: #9ca3af;
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+	transform: scale(1.05);
+}
+
+.collapse-button-circle.collapsed {
+	background: white;
+	color: #6b7280;
+	border-color: #d1d5db;
+	font-size: 9px;
+}
+
+.collapse-button-circle.collapsed:hover {
+	border-color: #9ca3af;
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
 .node-title {
 	font-size: 0.95rem;
 	font-weight: 500;
@@ -315,6 +366,12 @@ kbd {
 .react-flow__edge {
 	cursor: default;
 	pointer-events: none !important;
+}
+
+/* Collapsible edges should be interactive */
+.react-flow__edge.react-flow__edge-collapsible {
+	pointer-events: all !important;
+	cursor: pointer;
 }
 
 .react-flow__edge:hover .react-flow__edge-path {
