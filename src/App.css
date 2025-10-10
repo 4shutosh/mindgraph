@@ -84,9 +84,11 @@ body {
 	background: white;
 	border: 2px solid #d1d5db;
 	border-radius: 8px;
-	padding: 12px;
-	min-width: 60px;
+	padding: 14px 16px;
+	min-width: 80px;
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	font-size: 1.05rem;
+	font-weight: 500;
 }
 
 .mind-node.root-node:hover {
@@ -360,5 +362,6 @@ kbd {
 .mind-node.drop-target-hovered {
 	border: 2px solid #3b82f6 !important;
 	background: rgba(59, 130, 246, 0.12) !important;
-	box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2), 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+	box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2),
+		0 4px 12px rgba(59, 130, 246, 0.3) !important;
 }

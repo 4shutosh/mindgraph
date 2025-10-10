@@ -60,9 +60,14 @@ export default function Canvas({
 	);
 	const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
 	const [targetDropOrder, setTargetDropOrder] = useState<number | null>(null);
-	const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null);
+	const [dragStartPos, setDragStartPos] = useState<{
+		x: number;
+		y: number;
+	} | null>(null);
 	const [isDraggingForReparent, setIsDraggingForReparent] = useState(false);
-	const [potentialDropParentId, setPotentialDropParentId] = useState<string | null>(null);
+	const [potentialDropParentId, setPotentialDropParentId] = useState<
+		string | null
+	>(null);
 	const reactFlowInstance = useRef<ReactFlowInstance<
 		Node<MindNodeData>,
 		Edge
@@ -294,7 +299,11 @@ export default function Canvas({
 
 				// Determine if this node is at the target drop position (for vertical reordering)
 				let isDragOver = false;
-				if (draggingNodeId && targetDropOrder !== null && !isDraggingForReparent) {
+				if (
+					draggingNodeId &&
+					targetDropOrder !== null &&
+					!isDraggingForReparent
+				) {
 					const draggingInstance = graph.instances.find(
 						(i) => i.instanceId === draggingNodeId
 					);
@@ -310,9 +319,9 @@ export default function Canvas({
 				// Determine if this node is a valid drop target for reparenting
 				const isValidDropTarget = Boolean(
 					isDraggingForReparent &&
-					draggingNodeId &&
-					instance.instanceId !== draggingNodeId &&
-					!wouldCreateCircularDependency(draggingNodeId, instance.instanceId)
+						draggingNodeId &&
+						instance.instanceId !== draggingNodeId &&
+						!wouldCreateCircularDependency(draggingNodeId, instance.instanceId)
 				);
 
 				// Highlight if this is the current potential drop parent
@@ -821,7 +830,8 @@ export default function Canvas({
 	// Handle node drag - determine target drop position or reparent target
 	const handleNodeDrag = useCallback(
 		(_event: React.MouseEvent, node: Node) => {
-			if (!reactFlowInstance.current || !draggingNodeId || !dragStartPos) return;
+			if (!reactFlowInstance.current || !draggingNodeId || !dragStartPos)
+				return;
 
 			const draggingInstance = graph.instances.find(
 				(inst) => inst.instanceId === draggingNodeId
@@ -830,43 +840,48 @@ export default function Canvas({
 
 			// Calculate movements from start position
 			const horizontalMovement = Math.abs(node.position.x - dragStartPos.x);
-			
+
 			// NEW LOGIC: Check if we're hovering over a potential drop target
 			// This allows sibling-to-child reparenting even with vertical movement
 			let hoveringOverValidTarget = false;
-			
+
 			// Check if we're near any node that's NOT a sibling
 			graph.instances.forEach((instance) => {
 				// Skip self
 				if (instance.instanceId === draggingNodeId) return;
-				
+
 				// Skip if it would create circular dependency
-				if (wouldCreateCircularDependency(draggingNodeId, instance.instanceId)) return;
-				
+				if (wouldCreateCircularDependency(draggingNodeId, instance.instanceId))
+					return;
+
 				// Skip siblings (same parent) - we want to reorder those, not reparent
-				if (instance.parentInstanceId === draggingInstance.parentInstanceId) return;
-				
-				const targetNode = reactFlowInstance.current?.getNode(instance.instanceId);
+				if (instance.parentInstanceId === draggingInstance.parentInstanceId)
+					return;
+
+				const targetNode = reactFlowInstance.current?.getNode(
+					instance.instanceId
+				);
 				if (!targetNode) return;
-				
+
 				// Check if we're hovering near this node
 				const distance = Math.sqrt(
 					Math.pow(targetNode.position.x - node.position.x, 2) +
-					Math.pow(targetNode.position.y - node.position.y, 2)
+						Math.pow(targetNode.position.y - node.position.y, 2)
 				);
-				
+
 				const HOVER_THRESHOLD = 150; // Distance to consider "hovering over"
 				if (distance < HOVER_THRESHOLD) {
 					hoveringOverValidTarget = true;
 				}
 			});
-			
+
 			// DETECTION LOGIC:
 			// 1. If hovering over a valid non-sibling target -> REPARENT MODE
 			// 2. Else if significant horizontal movement -> REPARENT MODE (for general reparenting)
 			// 3. Else -> REORDER MODE (vertical reordering of siblings)
 			const REPARENT_THRESHOLD = 100;
-			const isReparentMode = hoveringOverValidTarget || horizontalMovement > REPARENT_THRESHOLD;
+			const isReparentMode =
+				hoveringOverValidTarget || horizontalMovement > REPARENT_THRESHOLD;
 			setIsDraggingForReparent(isReparentMode);
 
 			if (isReparentMode) {

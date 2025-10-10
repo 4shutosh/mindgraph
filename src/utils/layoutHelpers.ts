@@ -6,13 +6,13 @@ import { NodeInstance, TreeNode } from "../types";
  */
 const LAYOUT_CONFIG = {
 	horizontalSpacing: 200,
-	minHorizontalSpacing: 180,  // Minimum spacing for sparse trees
-	maxHorizontalSpacing: 350,  // Maximum spacing for dense trees
+	minHorizontalSpacing: 180, // Minimum spacing for sparse trees
+	maxHorizontalSpacing: 350, // Maximum spacing for dense trees
 	verticalSpacing: 75,
 	startX: 100,
 	startY: 100,
 	nodeMaxWidth: 300, // Match CSS max-width
-	nodeMinWidth: 60,  // Minimum node width
+	nodeMinWidth: 60, // Minimum node width
 	lineHeight: 24, // Match CSS line-height (1.5rem)
 	basePadding: 20, // Base padding for node (12px top + 12px bottom + some margin)
 };
@@ -103,7 +103,7 @@ function estimateNodeWidth(text: string): number {
 			currentLineLength += wordLength + 1; // +1 for space
 		}
 	}
-	
+
 	// Check the last line
 	maxLineLength = Math.max(maxLineLength, currentLineLength);
 
@@ -204,32 +204,43 @@ export function applyBalancedLayout(
 			.size([treeHeight, 1000])
 			.separation((a, b) => {
 				// Adaptive vertical spacing based on subtree density
-				
+
 				const aHeight = a.data.estimatedHeight;
 				const bHeight = b.data.estimatedHeight;
 				const avgHeight = (aHeight + bHeight) / 2;
 				const baseHeight = LAYOUT_CONFIG.lineHeight + LAYOUT_CONFIG.basePadding;
-				
+
 				// Base height factor for tight spacing
-				const baseHeightFactor = Math.max(0.25, avgHeight / baseHeight * 0.1);
+				const baseHeightFactor = Math.max(0.25, (avgHeight / baseHeight) * 0.1);
 
 				// If siblings, check parent's density
 				if (a.parent === b.parent && a.parent) {
-					const parentDescendants = descendantCounts.get(a.parent.data.instanceId) || 0;
+					const parentDescendants =
+						descendantCounts.get(a.parent.data.instanceId) || 0;
 					const siblingCount = siblingCounts.get(a.parent.data.instanceId) || 0;
-					
+
+					// Check if either sibling is a leaf node (no children)
+					const aIsLeaf = !a.children || a.children.length === 0;
+					const bIsLeaf = !b.children || b.children.length === 0;
+
 					// If parent has many descendants AND many direct children,
 					// we need more vertical spacing to prevent edge overlap
 					if (parentDescendants >= 5 && siblingCount >= 4) {
 						// Dense subtree: increase vertical spacing
-						const densityMultiplier = 1.5 + Math.min((siblingCount - 4) * 0.2, 1.0);
+						const densityMultiplier =
+							1.5 + Math.min((siblingCount - 4) * 0.2, 1.0);
 						return baseHeightFactor * densityMultiplier;
+					}
+
+					// If at least one sibling is a leaf node, add more spacing
+					if (aIsLeaf || bIsLeaf) {
+						return baseHeightFactor * 1.3; // 30% more spacing for leaf nodes
 					}
 				}
 
 				// Default tight spacing
 				return a.parent === b.parent
-					? baseHeightFactor      // Siblings: very tight
+					? baseHeightFactor // Siblings: very tight
 					: baseHeightFactor * 1.1; // Cousins: barely more
 			});
 
@@ -237,7 +248,7 @@ export function applyBalancedLayout(
 
 		// Use constant horizontal spacing for uniform edge lengths
 		// All nodes at the same depth get the same X position
-		const CONSTANT_HORIZONTAL_SPACING = 280; // Fixed spacing between levels
+		const CONSTANT_HORIZONTAL_SPACING = 240; // Fixed spacing between levels
 
 		layoutRoot.each((node: HierarchyPointNode<HierarchyNode>) => {
 			// Calculate depth (distance from root)
@@ -247,10 +258,10 @@ export function applyBalancedLayout(
 				depth++;
 				tempNode = tempNode.parent;
 			}
-			
+
 			// X position = startX + (depth × constant spacing)
-			const xPos = LAYOUT_CONFIG.startX + (depth * CONSTANT_HORIZONTAL_SPACING);
-			
+			const xPos = LAYOUT_CONFIG.startX + depth * CONSTANT_HORIZONTAL_SPACING;
+
 			positions.set(node.data.instanceId, {
 				x: xPos,
 				y: node.x + currentOffsetY,
