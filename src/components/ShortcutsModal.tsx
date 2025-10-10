@@ -44,6 +44,9 @@ const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose }) => {
 						<kbd>Del</kbd> → Delete
 					</div>
 					<div className="hint">
+						<kbd>Drag Node</kbd> → Reorder Siblings
+					</div>
+					<div className="hint">
 						<kbd>Space + Drag</kbd> → Pan
 					</div>
 					<div className="hint">

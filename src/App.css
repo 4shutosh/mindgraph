@@ -84,9 +84,11 @@ body {
 	background: white;
 	border: 2px solid #d1d5db;
 	border-radius: 8px;
-	padding: 12px;
-	min-width: 60px;
+	padding: 14px 16px;
+	min-width: 80px;
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	font-size: 1.05rem;
+	font-weight: 500;
 }
 
 .mind-node.root-node:hover {
@@ -100,10 +102,15 @@ body {
 	border: 2px solid transparent;
 	border-radius: 8px;
 	padding: 4px;
+	cursor: grab;
 }
 
 .mind-node.child-node:hover {
 	background: rgba(0, 0, 0, 0.02);
+}
+
+.mind-node.child-node:active {
+	cursor: grabbing;
 }
 
 /* Selected state shows border for all nodes */
@@ -111,6 +118,19 @@ body {
 	border-color: #3b82f6 !important;
 	background: white;
 	box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+}
+
+/* Dragging state - show visual feedback */
+.mind-node.dragging {
+	opacity: 0.5;
+	cursor: grabbing !important;
+}
+
+/* Drag over state - show drop target */
+.mind-node.drag-over {
+	border-color: #10b981 !important;
+	background: rgba(16, 185, 129, 0.1);
+	box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
 }
 
 .node-title {
@@ -328,4 +348,20 @@ kbd {
 .react-flow__node.selected .mind-node {
 	border-color: #3b82f6;
 	box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Reparenting Drop Target Styles - Balanced Design */
+/* Valid drop targets during reparenting - visible but not overwhelming */
+.mind-node.drop-target {
+	border: 2px dashed #3b82f6 !important;
+	background: rgba(59, 130, 246, 0.05) !important;
+	box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Currently hovered drop target - clear highlight */
+.mind-node.drop-target-hovered {
+	border: 2px solid #3b82f6 !important;
+	background: rgba(59, 130, 246, 0.12) !important;
+	box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2),
+		0 4px 12px rgba(59, 130, 246, 0.3) !important;
 }

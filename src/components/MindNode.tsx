@@ -9,14 +9,28 @@ export interface MindNodeData extends Record<string, unknown> {
 	onFinishEdit: (nodeId: string, newTitle: string, widthDelta: number) => void;
 	onCancelEdit: (nodeId: string) => void;
 	onWidthChange?: (nodeId: string, widthDelta: number) => void;
+	isDragging?: boolean;
+	isDragOver?: boolean;
+	isValidDropTarget?: boolean;
+	isDropTargetHovered?: boolean;
 }
 
 /**
  * Custom node component for the mindgraph with inline editing using contentEditable
  */
 function MindNode({ data, selected }: NodeProps) {
-	const { node, isEditing, isRoot, onFinishEdit, onCancelEdit, onWidthChange } =
-		data as MindNodeData;
+	const {
+		node,
+		isEditing,
+		isRoot,
+		onFinishEdit,
+		onCancelEdit,
+		onWidthChange,
+		isDragging,
+		isDragOver,
+		isValidDropTarget,
+		isDropTargetHovered,
+	} = data as MindNodeData;
 	const contentRef = useRef<HTMLDivElement>(null);
 	const originalValueRef = useRef<string>(node.title);
 	const initialWidthRef = useRef<number>(0);
@@ -121,7 +135,11 @@ function MindNode({ data, selected }: NodeProps) {
 			ref={nodeRef}
 			className={`mind-node ${isRoot ? "root-node" : "child-node"} ${
 				selected ? "selected" : ""
-			} ${isEditing ? "editing" : ""}`}
+			} ${isEditing ? "editing" : ""} ${isDragging ? "dragging" : ""} ${
+				isDragOver ? "drag-over" : ""
+			} ${isValidDropTarget ? "drop-target" : ""} ${
+				isDropTargetHovered ? "drop-target-hovered" : ""
+			}`}
 		>
 			{/* Handle positioning: center for root, sides for children */}
 			<Handle

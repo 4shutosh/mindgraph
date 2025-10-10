@@ -34,9 +34,21 @@ npm run build
 - **Delete/Backspace**: Delete selected nodes and their entire subtrees
 - **Double-click node**: Edit node inline
 - **Click node**: Focus node for keyboard navigation
+- **Drag node vertically**: Reorder sibling nodes (change vertical position)
+- **Drag node horizontally 100px+**: Reparent node to new parent (moves entire subtree!)
+  - Subtle gray borders show valid drop targets
+  - Ghost edge preview shows new connection
+  - 🛡️ Prevents circular dependencies automatically
 - **Space + Drag**: Pan the canvas
 - **Click + Drag**: Multi-select nodes (box selection)
 - **Shift + Click**: Add to selection
+
+### Navigation
+
+- **Arrow Left**: Move to parent node
+- **Arrow Right**: Move to first child node
+- **Arrow Up**: Move to previous sibling
+- **Arrow Down**: Move to next sibling
 
 ## Tech Stack
 
