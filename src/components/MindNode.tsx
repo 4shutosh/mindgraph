@@ -195,20 +195,24 @@ function MindNode({ data, selected, id }: NodeProps) {
 			>
 				{node.title}
 			</div>
-			
+
 			{/* Collapse/Expand button - shown on hover or when collapsed */}
 			{hasChildren && (isHovered || isCollapsed) && (
-				<div 
+				<div
 					className="collapse-button"
 					onClick={handleToggleClick}
 					onMouseDown={(e) => e.stopPropagation()}
 				>
-					<div className={`collapse-button-circle ${isCollapsed ? 'collapsed' : ''}`}>
+					<div
+						className={`collapse-button-circle ${
+							isCollapsed ? "collapsed" : ""
+						}`}
+					>
 						{isCollapsed && collapsedCount}
 					</div>
 				</div>
 			)}
-			
+
 			<Handle
 				type="source"
 				position={Position.Right}

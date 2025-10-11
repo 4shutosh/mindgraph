@@ -95,42 +95,44 @@ export default function Canvas({
 		[graph.instances]
 	);
 
-	// Delete node and all its instances/edges
-	const deleteNode = useCallback(
-		(nodeId: string) => {
-			// Find all instances with this nodeId
-			const instancesToDelete = graph.instances.filter(
-				(inst) => inst.nodeId === nodeId
+	// Delete a specific instance and its descendants
+	// Only deletes the underlying node if no other instances reference it
+	const deleteInstance = useCallback(
+		(instanceId: string) => {
+			const instanceToDelete = graph.instances.find(
+				(inst) => inst.instanceId === instanceId
 			);
 
-			if (instancesToDelete.length === 0) {
+			if (!instanceToDelete) {
 				setEditingInstanceId(null);
 				return;
 			}
 
-			// Get all instances to delete (the instance itself + all descendants)
-			const allInstancesToDelete = instancesToDelete.flatMap((inst) => [
-				inst, // Include the instance itself
-				...getAllDescendants(inst.instanceId, graph.instances), // Plus all descendants
+			// Get all descendants of this instance to delete
+			const descendants = getAllDescendants(instanceId, graph.instances);
+			const instanceIdsToDelete = new Set<string>([
+				instanceId,
+				...descendants.map((d) => d.instanceId),
 			]);
-			const instanceIdsToDelete = new Set(
-				allInstancesToDelete.map((inst) => inst.instanceId)
-			);
 
-			// Filter out deleted instances and their edges
+			// Filter out deleted instances
 			const remainingInstances = graph.instances.filter(
 				(inst) => !instanceIdsToDelete.has(inst.instanceId)
 			);
+
+			// Filter out edges connected to deleted instances
 			const remainingEdges = graph.edges.filter(
 				(edge) =>
 					!instanceIdsToDelete.has(edge.source) &&
 					!instanceIdsToDelete.has(edge.target)
 			);
 
-			// Remove nodes that are no longer referenced
+			// Find which nodes are no longer referenced by any remaining instance
 			const remainingNodeIds = new Set(
 				remainingInstances.map((inst) => inst.nodeId)
 			);
+
+			// Keep only nodes that still have at least one instance
 			const remainingNodes: Record<string, (typeof graph.nodes)[string]> = {};
 			Object.entries(graph.nodes).forEach(([nodeId, node]) => {
 				if (remainingNodeIds.has(nodeId)) {
@@ -154,21 +156,13 @@ export default function Canvas({
 			setEditingInstanceId(null);
 		},
 		[graph, onGraphChange]
-	); // Check if a node has any children instances
-	const nodeHasChildren = useCallback(
-		(nodeId: string): boolean => {
-			// Find all instances of this node
-			const nodeInstances = graph.instances.filter(
-				(inst) => inst.nodeId === nodeId
-			);
-			// Check if any instance has children
-			return nodeInstances.some((instance) => {
-				const children = getChildrenInstances(
-					instance.instanceId,
-					graph.instances
-				);
-				return children.length > 0;
-			});
+	);
+
+	// Check if a specific instance has any children
+	const instanceHasChildren = useCallback(
+		(instanceId: string): boolean => {
+			const children = getChildrenInstances(instanceId, graph.instances);
+			return children.length > 0;
 		},
 		[graph.instances]
 	);
@@ -216,13 +210,21 @@ export default function Canvas({
 	// Finish editing and save changes
 	const handleFinishEdit = useCallback(
 		(nodeId: string, newTitle: string, _widthDelta: number = 0) => {
-			// If title is empty, only delete if node has no children
+			// Get the instance being edited
+			const editingInstance = graph.instances.find(
+				(inst) => inst.instanceId === editingInstanceId
+			);
+
+			// If title is empty, delete this specific instance (if it has no children)
 			if (newTitle.trim() === "") {
-				if (!nodeHasChildren(nodeId)) {
-					deleteNode(nodeId);
+				if (
+					editingInstance &&
+					!instanceHasChildren(editingInstance.instanceId)
+				) {
+					deleteInstance(editingInstance.instanceId);
 					return;
 				}
-				// If node has children, keep it with empty title
+				// If instance has children, keep it with empty title
 				// (User can manually delete it later if needed)
 			}
 
@@ -231,11 +233,6 @@ export default function Canvas({
 				title: newTitle.trim() || "(empty)", // Show placeholder for empty nodes with children
 				updatedAt: Date.now(),
 			};
-
-			// Find the instance that was being edited to maintain focus
-			const editingInstance = graph.instances.find(
-				(inst) => inst.instanceId === editingInstanceId
-			);
 
 			onGraphChange({
 				...graph,
@@ -255,17 +252,27 @@ export default function Canvas({
 				}
 			}, 100);
 		},
-		[graph, onGraphChange, deleteNode, nodeHasChildren, editingInstanceId]
+		[
+			graph,
+			onGraphChange,
+			deleteInstance,
+			instanceHasChildren,
+			editingInstanceId,
+		]
 	);
 
-	// Cancel editing - only delete if node is empty AND has no children
+	// Cancel editing - only delete if instance is empty AND has no children
 	const handleCancelEdit = useCallback(
 		(nodeId: string) => {
 			const node = graph.nodes[nodeId];
-			// Only delete if the node is empty/new and has no children
-			if (!node.title || node.title.trim() === "") {
-				if (!nodeHasChildren(nodeId)) {
-					deleteNode(nodeId);
+			const editingInstance = graph.instances.find(
+				(inst) => inst.instanceId === editingInstanceId
+			);
+
+			// Only delete if the node is empty/new and this instance has no children
+			if ((!node.title || node.title.trim() === "") && editingInstance) {
+				if (!instanceHasChildren(editingInstance.instanceId)) {
+					deleteInstance(editingInstance.instanceId);
 					return;
 				}
 			}
@@ -280,7 +287,13 @@ export default function Canvas({
 				}
 			}, 100);
 		},
-		[graph.nodes, deleteNode, nodeHasChildren]
+		[
+			graph.nodes,
+			graph.instances,
+			deleteInstance,
+			instanceHasChildren,
+			editingInstanceId,
+		]
 	);
 
 	// Toggle collapse/expand of a subtree
@@ -422,7 +435,7 @@ export default function Canvas({
 					draggable: !isEditing && !isRoot, // Allow dragging non-root nodes when not editing
 				};
 			});
-		
+
 		const flowEdges: Edge[] = graph.edges
 			.filter((edge) => {
 				// Filter out edges to hidden nodes
