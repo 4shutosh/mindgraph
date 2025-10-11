@@ -141,7 +141,7 @@ body {
 /* Collapse/Expand button on node */
 .collapse-button {
 	position: absolute;
-	right: -18px;
+	right: -12px;
 	top: 50%;
 	transform: translateY(-50%);
 	z-index: 100;

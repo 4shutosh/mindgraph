@@ -133,10 +133,14 @@ function buildHierarchyTree(
 		const estimatedHeight = estimateNodeHeight(nodeData?.title || "");
 		const estimatedWidth = estimateNodeWidth(nodeData?.title || "");
 
-		const children = instances
-			.filter((inst) => inst.parentInstanceId === instance.instanceId)
-			.sort((a, b) => a.siblingOrder - b.siblingOrder)
-			.map((child) => buildNode(child));
+		// If this node is collapsed, don't include its children in the layout
+		let children: HierarchyNode[] = [];
+		if (!instance.isCollapsed) {
+			children = instances
+				.filter((inst) => inst.parentInstanceId === instance.instanceId)
+				.sort((a, b) => a.siblingOrder - b.siblingOrder)
+				.map((child) => buildNode(child));
+		}
 
 		return {
 			instanceId: instance.instanceId,
@@ -196,22 +200,21 @@ export function applyBalancedLayout(
 			}
 		});
 
-		// Compact tree height - nodes should be close together
-		// Using a smaller multiplier for tighter vertical spacing
-		const treeHeight = nodeCount * (maxHeight * 0.45); // Further reduced for tighter spacing
+		// Increase tree height for more vertical spacing
+		const treeHeight = nodeCount * (maxHeight * 1.1); // Much larger multiplier for generous spacing
 
 		const clusterLayout = cluster<HierarchyNode>()
 			.size([treeHeight, 1000])
 			.separation((a, b) => {
-				// Adaptive vertical spacing based on subtree density
+				// Generous vertical spacing
 
 				const aHeight = a.data.estimatedHeight;
 				const bHeight = b.data.estimatedHeight;
 				const avgHeight = (aHeight + bHeight) / 2;
 				const baseHeight = LAYOUT_CONFIG.lineHeight + LAYOUT_CONFIG.basePadding;
 
-				// Base height factor for tight spacing
-				const baseHeightFactor = Math.max(0.25, (avgHeight / baseHeight) * 0.1);
+				// Much larger base spacing
+				const baseHeightFactor = Math.max(0.45, (avgHeight / baseHeight) * 0.5);
 
 				// If siblings, check parent's density
 				if (a.parent === b.parent && a.parent) {
@@ -232,16 +235,22 @@ export function applyBalancedLayout(
 						return baseHeightFactor * densityMultiplier;
 					}
 
+					// If parent has shallow subtree (only one level of children),
+					// increase spacing significantly for better readability
+					if (parentDescendants > 0 && parentDescendants === siblingCount) {
+						return baseHeightFactor * 1.5; // 2.5x spacing for single-level children
+					}
+
 					// If at least one sibling is a leaf node, add more spacing
 					if (aIsLeaf || bIsLeaf) {
-						return baseHeightFactor * 1.3; // 30% more spacing for leaf nodes
+						return baseHeightFactor * 1.4;
 					}
 				}
 
-				// Default tight spacing
+				// Default generous spacing
 				return a.parent === b.parent
-					? baseHeightFactor // Siblings: very tight
-					: baseHeightFactor * 1.1; // Cousins: barely more
+					? baseHeightFactor // Siblings: generous spacing
+					: baseHeightFactor * 1.2; // Cousins: even more spacing
 			});
 
 		const layoutRoot = clusterLayout(root);
