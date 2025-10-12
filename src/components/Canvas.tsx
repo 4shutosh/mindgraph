@@ -315,20 +315,20 @@ export default function Canvas({
 				return inst;
 			});
 
-		// Recalculate layout with new collapsed state
-		const layoutedInstances = recalculateLayout(
-			updatedInstances,
-			graph.nodes
-		);
+			// Recalculate layout with new collapsed state
+			const layoutedInstances = recalculateLayout(
+				updatedInstances,
+				graph.nodes
+			);
 
-		onGraphChange({
-			...graph,
-			instances: layoutedInstances,
-			focusedInstanceId: null, // Clear focus when collapsing/expanding
-		});
-	},
-	[graph, onGraphChange]
-);	// Convert graph data to React Flow format
+			onGraphChange({
+				...graph,
+				instances: layoutedInstances,
+				focusedInstanceId: null, // Clear focus when collapsing/expanding
+			});
+		},
+		[graph, onGraphChange]
+	); // Convert graph data to React Flow format
 	const syncGraphToFlow = useCallback(() => {
 		// Helper: Get all instances that should be hidden (descendants of collapsed nodes)
 		const getHiddenInstanceIds = (): Set<string> => {

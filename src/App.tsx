@@ -6,6 +6,11 @@ import { MindGraph } from "./types";
 import { loadGraph, saveGraph, createEmptyGraph } from "./utils/storage";
 import { useHistory } from "./utils/useHistory";
 import { createNode, createNodeInstance } from "./utils/nodeHelpers";
+import {
+	downloadGraphAsFile,
+	importGraphFromFile,
+	mergeGraphs,
+} from "./utils/importExport";
 import "./App.css";
 
 function App() {
@@ -72,6 +77,47 @@ function App() {
 		}
 	}, [instanceToEdit]);
 
+	// Handle export
+	const handleExport = useCallback(() => {
+		try {
+			downloadGraphAsFile(graph);
+			console.log("Graph exported successfully");
+		} catch (error) {
+			console.error("Failed to export graph:", error);
+			alert("Failed to export graph. Check console for details.");
+		}
+	}, [graph]);
+
+	// Handle import
+	const handleImport = useCallback(async () => {
+		try {
+			const result = await importGraphFromFile();
+
+			if (result.success && result.graph) {
+				// Merge imported graph with current graph (non-destructive)
+				const mergedGraph = mergeGraphs(graph, result.graph);
+
+				handleGraphChange(mergedGraph);
+				console.log("Graph imported and merged successfully");
+
+				// Show success message with details
+				const importedNodeCount = Object.keys(result.graph.nodes).length;
+				const importedInstanceCount = result.graph.instances.length;
+				alert(
+					`✅ Graph imported successfully!\n\n` +
+						`Added ${importedNodeCount} nodes and ${importedInstanceCount} instances.\n` +
+						`The imported graph has been placed on the canvas as a separate tree.`
+				);
+			} else {
+				console.error("Import failed:", result.error);
+				alert(`❌ Failed to import graph:\n\n${result.error}`);
+			}
+		} catch (error) {
+			console.error("Failed to import graph:", error);
+			alert("❌ Failed to import graph. Check console for details.");
+		}
+	}, [graph, handleGraphChange]);
+
 	// Keyboard shortcuts for undo/redo
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -112,6 +158,8 @@ function App() {
 			<Header
 				onNewNode={handleCreateNode}
 				onToggleShortcuts={() => setIsShortcutsModalOpen(true)}
+				onExport={handleExport}
+				onImport={handleImport}
 			/>
 
 			<Canvas
