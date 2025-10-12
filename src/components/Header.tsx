@@ -3,9 +3,16 @@ import React from "react";
 interface HeaderProps {
 	onNewNode: () => void;
 	onToggleShortcuts: () => void;
+	onExport: () => void;
+	onImport: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onNewNode, onToggleShortcuts }) => {
+const Header: React.FC<HeaderProps> = ({ 
+	onNewNode, 
+	onToggleShortcuts,
+	onExport,
+	onImport 
+}) => {
 	return (
 		<header className="app-header">
 			<div className="flex flex-col header-left">
@@ -18,6 +25,22 @@ const Header: React.FC<HeaderProps> = ({ onNewNode, onToggleShortcuts }) => {
 				<div className="button-group">
 					<button className="btn btn-primary" onClick={onNewNode}>
 						+ New Root Node
+					</button>
+				</div>
+				<div className="button-group">
+					<button 
+						className="btn btn-secondary" 
+						onClick={onImport}
+						title="Import graph from JSON file"
+					>
+						Import
+					</button>
+					<button 
+						className="btn btn-secondary" 
+						onClick={onExport}
+						title="Export graph to JSON file"
+					>
+						Export
 					</button>
 				</div>
 				{/* <div className="button-group history-buttons">
