@@ -9,6 +9,7 @@
 	z-index: 1000;
 	min-width: 250px;
 	max-width: 400px;
+	outline: none; /* Remove focus outline since we handle focus programmatically */
 }
 
 .search-dropdown-item {

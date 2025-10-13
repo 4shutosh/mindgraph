@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import {
 	ReactFlow,
 	Node,
@@ -15,7 +15,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { MindGraph, TreeNode } from "../types";
+import { MindGraph, TreeNode, NodeInstance } from "../types";
 import {
 	createNode,
 	createNodeInstance,
@@ -26,7 +26,6 @@ import {
 	getFirstChildInstance,
 	getNextSiblingInstance,
 	getPreviousSiblingInstance,
-	getNodePath,
 } from "../utils/nodeHelpers";
 import { recalculateLayout } from "../utils/layoutHelpers";
 import MindNode, { MindNodeData } from "./MindNode";
@@ -36,6 +35,9 @@ import { NodeSearchTrie } from "../utils/trie";
 const nodeTypes: NodeTypes = {
 	mindNode: MindNode,
 };
+
+// Maximum number of hyperlink suggestions to show
+const MAX_HYPERLINK_SUGGESTIONS = 10;
 
 interface CanvasProps {
 	graph: MindGraph;
@@ -88,6 +90,27 @@ export default function Canvas({
 	}>({ x: 0, y: 0 });
 	const searchTrie = useRef(new NodeSearchTrie());
 	const isSelectingHyperlinkRef = useRef(false); // Flag to prevent input events during selection
+
+	// Pre-compute child counts for performance (used in dropdown)
+	const childCountsMap = useMemo(() => {
+		const counts = new Map<string, number>();
+		graph.instances.forEach((inst) => {
+			if (inst.parentInstanceId) {
+				const current = counts.get(inst.parentInstanceId) || 0;
+				counts.set(inst.parentInstanceId, current + 1);
+			}
+		});
+		return counts;
+	}, [graph.instances]);
+
+	// Pre-compute instance lookup map for performance
+	const instanceMap = useMemo(() => {
+		const map = new Map<string, NodeInstance>();
+		graph.instances.forEach((inst) =>
+			map.set(inst.instanceId, inst)
+		);
+		return map;
+	}, [graph.instances]);
 
 	// Effect to trigger editing mode from parent
 	useEffect(() => {
@@ -325,20 +348,12 @@ export default function Canvas({
 			// Set flag to prevent input event processing
 			isSelectingHyperlinkRef.current = true;
 
-			// First, exit hyperlink mode to prevent further input processing
+			// Exit hyperlink mode first
 			setIsHyperlinkMode(false);
 			setHyperlinkQuery("");
 			setHyperlinkSuggestions([]);
 
-			// Update the contentEditable element's text immediately
-			const contentEditableElement = document.querySelector(
-				'.node-title[contenteditable="true"]'
-			) as HTMLElement;
-			if (contentEditableElement) {
-				contentEditableElement.textContent = selectedNode.title;
-			}
-
-			// Update the node to be a hyperlink
+			// Update the node to be a hyperlink - React will handle DOM updates
 			const updatedNode: TreeNode = {
 				...currentNode,
 				title: selectedNode.title,
@@ -351,7 +366,7 @@ export default function Canvas({
 				nodes: { ...graph.nodes, [currentNode.nodeId]: updatedNode },
 			});
 
-			// Exit editing mode
+			// Exit editing mode - React will re-render with new title
 			setEditingInstanceId(null);
 
 			// Reset flag after a short delay
@@ -422,14 +437,17 @@ export default function Canvas({
 
 				if (query.trim()) {
 					// Search for matching nodes
-					const matchingNodeIds = searchTrie.current.search(query, 10);
+					const matchingNodeIds = searchTrie.current.search(
+						query,
+						MAX_HYPERLINK_SUGGESTIONS
+					);
 					const suggestions = Array.from(matchingNodeIds)
 						.map((nodeId) => graph.nodes[nodeId])
 						.filter(
 							(node) =>
 								node && node.nodeId !== currentNodeId && !node.hyperlinkTargetId
 						)
-						.slice(0, 10);
+						.slice(0, MAX_HYPERLINK_SUGGESTIONS);
 					setHyperlinkSuggestions(suggestions);
 				} else {
 					// Show all available nodes
@@ -442,7 +460,7 @@ export default function Canvas({
 								node.title &&
 								node.title.trim() !== ""
 						)
-						.slice(0, 10);
+						.slice(0, MAX_HYPERLINK_SUGGESTIONS);
 					setHyperlinkSuggestions(allNodes);
 				}
 
@@ -460,14 +478,17 @@ export default function Canvas({
 				// Search for matching nodes (exclude the current node)
 				const currentNodeId = graph.nodes[editingInstance.nodeId].nodeId;
 				if (query.trim()) {
-					const matchingNodeIds = searchTrie.current.search(query, 10);
+					const matchingNodeIds = searchTrie.current.search(
+						query,
+						MAX_HYPERLINK_SUGGESTIONS
+					);
 					const suggestions = Array.from(matchingNodeIds)
 						.map((nodeId) => graph.nodes[nodeId])
 						.filter(
 							(node) =>
 								node && node.nodeId !== currentNodeId && !node.hyperlinkTargetId
 						)
-						.slice(0, 10);
+						.slice(0, MAX_HYPERLINK_SUGGESTIONS);
 					setHyperlinkSuggestions(suggestions);
 				} else {
 					// Show all available nodes when only "/" is present
@@ -480,7 +501,7 @@ export default function Canvas({
 								node.title &&
 								node.title.trim() !== ""
 						)
-						.slice(0, 10);
+						.slice(0, MAX_HYPERLINK_SUGGESTIONS);
 					setHyperlinkSuggestions(allNodes);
 				}
 
@@ -739,6 +760,7 @@ export default function Canvas({
 						onToggleCollapse: handleToggleCollapse,
 						onHyperlinkClick: handleHyperlinkClick,
 						isHyperlink,
+						isHyperlinkMode,
 					},
 					selected: isFocused,
 					draggable: !isEditing && !isRoot, // Allow dragging non-root nodes when not editing
@@ -1157,6 +1179,11 @@ export default function Canvas({
 				return;
 			}
 
+			// Ignore if hyperlink dropdown is open (let SearchDropdown handle keyboard events)
+			if (isHyperlinkMode) {
+				return;
+			}
+
 			// Delete selected nodes: Delete or Backspace (handle this first, regardless of focus)
 			if (e.key === "Delete" || e.key === "Backspace") {
 				e.preventDefault();
@@ -1218,6 +1245,7 @@ export default function Canvas({
 		handleCreateChild,
 		handleDeleteNodes,
 		editingInstanceId,
+		isHyperlinkMode,
 	]);
 
 	// Handle node drag start
@@ -1605,6 +1633,8 @@ export default function Canvas({
 					onClose={closeHyperlinkDropdown}
 					nodes={graph.nodes}
 					instances={graph.instances}
+					childCountsMap={childCountsMap}
+					instanceMap={instanceMap}
 				/>
 			)}
 		</ReactFlow>

@@ -110,9 +110,24 @@ export function importGraph(jsonString: string): {
 			};
 		}
 
+		// Clean up broken hyperlinks (validateGraph marks them for cleanup)
+		const cleanedNodes: Record<string, TreeNode> = {};
+		for (const [nodeId, node] of Object.entries(data.graph.nodes)) {
+			// Create new node object, removing broken hyperlinks
+			if (node.hyperlinkTargetId && !data.graph.nodes[node.hyperlinkTargetId]) {
+				console.warn(
+					`Removing broken hyperlink from node ${nodeId} to ${node.hyperlinkTargetId}`
+				);
+				const { hyperlinkTargetId, ...nodeWithoutHyperlink } = node;
+				cleanedNodes[nodeId] = nodeWithoutHyperlink;
+			} else {
+				cleanedNodes[nodeId] = node;
+			}
+		}
+
 		// Ensure edges exist (for forward compatibility with v2.0 that may not have edges)
 		// If edges are missing or empty, derive them from instances
-		let finalGraph = data.graph;
+		let finalGraph = { ...data.graph, nodes: cleanedNodes };
 		if (!finalGraph.edges || finalGraph.edges.length === 0) {
 			console.log("Edges missing in import, deriving from instances...");
 			finalGraph = {
@@ -196,13 +211,12 @@ function validateGraph(graph: MindGraph): string | null {
 	}
 
 	// Validate hyperlink references after all nodes are collected
+	// Don't mutate - just validate, cleanup happens in parseImportedJSON
 	for (const [nodeId, node] of Object.entries(graph.nodes)) {
 		if (node.hyperlinkTargetId && !nodeIds.has(node.hyperlinkTargetId)) {
 			console.warn(
-				`Node ${nodeId} has hyperlink to non-existent node ${node.hyperlinkTargetId}, will be removed`
+				`Node ${nodeId} has hyperlink to non-existent node ${node.hyperlinkTargetId}, will be cleaned up`
 			);
-			// Remove broken hyperlink reference
-			delete node.hyperlinkTargetId;
 		}
 	}
 

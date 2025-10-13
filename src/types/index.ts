@@ -18,7 +18,11 @@ export interface TreeNode {
 	/** Child node IDs (references) */
 	children: string[];
 
-	/** If this node is a hyperlink, the target nodeId it links to */
+	/**
+	 * If set, this node is a hyperlink pointing to another node.
+	 * When clicked, the view will navigate to the target node.
+	 * The hyperlink is automatically broken if the node's title changes.
+	 */
 	hyperlinkTargetId?: string;
 }
 

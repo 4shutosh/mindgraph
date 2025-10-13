@@ -11,6 +11,8 @@ interface SearchDropdownProps {
 	onClose: () => void;
 	nodes: Record<string, TreeNode>;
 	instances: NodeInstance[];
+	childCountsMap: Map<string, number>;
+	instanceMap: Map<string, NodeInstance>;
 }
 
 /**
@@ -24,43 +26,93 @@ export default function SearchDropdown({
 	onClose,
 	nodes,
 	instances,
+	childCountsMap,
+	instanceMap,
 }: SearchDropdownProps) {
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const dropdownRef = useRef<HTMLDivElement>(null);
+	
+	// Use refs to avoid stale closures
+	const onSelectRef = useRef(onSelect);
+	const onCloseRef = useRef(onClose);
+
+	// Update refs when props change
+	useEffect(() => {
+		onSelectRef.current = onSelect;
+		onCloseRef.current = onClose;
+	});
+
+	// Don't auto-focus dropdown - keep contentEditable focused so user can continue typing
+	// Instead, we'll capture keyboard events globally but only when dropdown is visible
 
 	// Reset selected index when suggestions change
 	useEffect(() => {
 		setSelectedIndex(0);
 	}, [suggestions]);
 
-	// Handle keyboard navigation
+	// Handle keyboard navigation globally while dropdown is mounted
+	// We need global listener because contentEditable keeps focus for typing
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (suggestions.length === 0) return;
 
+			// Only handle if we're not typing regular text
+			// Let normal typing through, only intercept navigation keys
 			if (e.key === "ArrowDown") {
 				e.preventDefault();
+				e.stopPropagation();
 				setSelectedIndex((prev) =>
 					prev < suggestions.length - 1 ? prev + 1 : prev
 				);
 			} else if (e.key === "ArrowUp") {
 				e.preventDefault();
+				e.stopPropagation();
 				setSelectedIndex((prev) => (prev > 0 ? prev - 1 : 0));
-			} else if (e.key === "Enter") {
+			} else if (e.key === "Enter" || e.key === "Tab") {
 				e.preventDefault();
 				e.stopPropagation();
 				if (suggestions[selectedIndex]) {
-					onSelect(suggestions[selectedIndex]);
+					onSelectRef.current(suggestions[selectedIndex]);
 				}
 			} else if (e.key === "Escape") {
 				e.preventDefault();
-				onClose();
+				e.stopPropagation();
+				onCloseRef.current();
 			}
 		};
 
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [suggestions, selectedIndex, onSelect, onClose]);
+		// Add listener to document instead of window for better scoping
+		document.addEventListener("keydown", handleKeyDown, true);
+		return () => document.removeEventListener("keydown", handleKeyDown, true);
+	}, [suggestions, selectedIndex]);
+
+	// Handle direct keyboard events on the dropdown element (for accessibility)
+	const handleDirectKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+		// This is a fallback for when dropdown somehow gets focus
+		if (suggestions.length === 0) return;
+
+		if (e.key === "ArrowDown") {
+			e.preventDefault();
+			e.stopPropagation();
+			setSelectedIndex((prev) =>
+				prev < suggestions.length - 1 ? prev + 1 : prev
+			);
+		} else if (e.key === "ArrowUp") {
+			e.preventDefault();
+			e.stopPropagation();
+			setSelectedIndex((prev) => (prev > 0 ? prev - 1 : 0));
+		} else if (e.key === "Enter" || e.key === "Tab") {
+			e.preventDefault();
+			e.stopPropagation();
+			if (suggestions[selectedIndex]) {
+				onSelectRef.current(suggestions[selectedIndex]);
+			}
+		} else if (e.key === "Escape") {
+			e.preventDefault();
+			e.stopPropagation();
+			onCloseRef.current();
+		}
+	};
 
 	// Auto-scroll selected item into view
 	useEffect(() => {
@@ -113,7 +165,7 @@ export default function SearchDropdown({
 		);
 	};
 
-	// Format path with immediate parent and child count
+	// Format path with immediate parent and child count - optimized with pre-computed maps
 	const formatNodeContext = (
 		node: TreeNode,
 		path: string[]
@@ -121,18 +173,16 @@ export default function SearchDropdown({
 		// Get immediate parent (second to last in path, since last is the node itself)
 		const parent = path.length > 1 ? path[path.length - 2] : "";
 
-		// Count children by finding instances of this node and checking their children
-		const nodeInstances = instances.filter(
+		// Get child count using pre-computed map - O(1) instead of O(n)
+		let childCount = 0;
+		
+		// Find the first instance of this node
+		const nodeInstance = Array.from(instanceMap.values()).find(
 			(inst) => inst.nodeId === node.nodeId
 		);
-		let childCount = 0;
-
-		if (nodeInstances.length > 0) {
-			// Use the first instance to count children
-			const firstInstance = nodeInstances[0];
-			childCount = instances.filter(
-				(inst) => inst.parentInstanceId === firstInstance.instanceId
-			).length;
+		
+		if (nodeInstance) {
+			childCount = childCountsMap.get(nodeInstance.instanceId) || 0;
 		}
 
 		return { parent, childCount };
@@ -144,9 +194,11 @@ export default function SearchDropdown({
 			className="search-dropdown"
 			style={{ left: position.x, top: position.y }}
 			onMouseDown={(e) => e.preventDefault()} // Prevent blur from contentEditable
+			onKeyDown={handleDirectKeyDown}
+			tabIndex={-1} // Make focusable but not in tab order
 		>
 			{suggestions.map((node, index) => {
-				const path = getNodePath(node.nodeId, nodes, instances);
+				const path = getNodePath(node.nodeId, nodes, instances, instanceMap);
 				const { parent, childCount } = formatNodeContext(node, path);
 
 				return (

@@ -33,11 +33,15 @@ export class NodeSearchTrie {
 
 	/**
 	 * Insert a node into the trie
+	 * Validates input and normalizes text before insertion
 	 */
 	insert(nodeId: string, title: string): void {
-		if (!title || title.trim() === "") return;
+		// Validate inputs
+		if (!nodeId || !title || title.trim() === "") return;
 
 		const normalizedTitle = this.normalize(title);
+		if (normalizedTitle.length === 0) return;
+		
 		let current = this.root;
 
 		// Insert the full title

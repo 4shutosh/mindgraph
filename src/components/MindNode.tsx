@@ -19,6 +19,11 @@ export interface MindNodeData extends Record<string, unknown> {
 	onToggleCollapse?: (instanceId: string) => void;
 	onHyperlinkClick?: (targetNodeId: string) => void;
 	isHyperlink?: boolean;
+	/**
+	 * UI state indicating whether hyperlink dropdown is currently open.
+	 * Used to control keyboard event handling during hyperlink creation.
+	 */
+	isHyperlinkMode?: boolean;
 }
 
 /**
@@ -42,6 +47,7 @@ function MindNode({ data, selected, id }: NodeProps) {
 		onToggleCollapse,
 		onHyperlinkClick,
 		isHyperlink,
+		isHyperlinkMode,
 	} = data as MindNodeData;
 	const contentRef = useRef<HTMLDivElement>(null);
 	const originalValueRef = useRef<string>(node.title);
@@ -102,6 +108,14 @@ function MindNode({ data, selected, id }: NodeProps) {
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+		// If hyperlink dropdown is open, let it handle keyboard events
+		if (isHyperlinkMode) {
+			// Don't prevent default for Enter and Tab when dropdown is open
+			if (e.key === "Enter" || e.key === "Tab") {
+				return;
+			}
+		}
+
 		if (e.key === "Enter") {
 			e.preventDefault();
 			e.stopPropagation(); // Prevent event from bubbling to Canvas
