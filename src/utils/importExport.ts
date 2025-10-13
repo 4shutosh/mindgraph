@@ -128,7 +128,9 @@ export function importGraph(jsonString: string): {
 	} catch (error) {
 		return {
 			success: false,
-			error: `Failed to parse JSON: ${error instanceof Error ? error.message : String(error)}`,
+			error: `Failed to parse JSON: ${
+				error instanceof Error ? error.message : String(error)
+			}`,
 		};
 	}
 }
@@ -185,7 +187,7 @@ function validateGraph(graph: MindGraph): string | null {
 
 		// Validate hyperlink target if present
 		if (node.hyperlinkTargetId !== undefined) {
-			if (typeof node.hyperlinkTargetId !== 'string') {
+			if (typeof node.hyperlinkTargetId !== "string") {
 				return `Node ${nodeId} has invalid hyperlinkTargetId type`;
 			}
 		}
@@ -196,7 +198,9 @@ function validateGraph(graph: MindGraph): string | null {
 	// Validate hyperlink references after all nodes are collected
 	for (const [nodeId, node] of Object.entries(graph.nodes)) {
 		if (node.hyperlinkTargetId && !nodeIds.has(node.hyperlinkTargetId)) {
-			console.warn(`Node ${nodeId} has hyperlink to non-existent node ${node.hyperlinkTargetId}, will be removed`);
+			console.warn(
+				`Node ${nodeId} has hyperlink to non-existent node ${node.hyperlinkTargetId}, will be removed`
+			);
 			// Remove broken hyperlink reference
 			delete node.hyperlinkTargetId;
 		}
@@ -213,11 +217,18 @@ function validateGraph(graph: MindGraph): string | null {
 			return `Instance ${instance.instanceId} references non-existent node ${instance.nodeId}`;
 		}
 
-		if (!instance.position || typeof instance.position.x !== "number" || typeof instance.position.y !== "number") {
+		if (
+			!instance.position ||
+			typeof instance.position.x !== "number" ||
+			typeof instance.position.y !== "number"
+		) {
 			return `Instance ${instance.instanceId} has invalid position`;
 		}
 
-		if (typeof instance.depth !== "number" || typeof instance.siblingOrder !== "number") {
+		if (
+			typeof instance.depth !== "number" ||
+			typeof instance.siblingOrder !== "number"
+		) {
 			return `Instance ${instance.instanceId} has invalid depth or siblingOrder`;
 		}
 
@@ -301,7 +312,9 @@ export function importGraphFromFile(): Promise<{
 			} catch (error) {
 				resolve({
 					success: false,
-					error: `Failed to read file: ${error instanceof Error ? error.message : String(error)}`,
+					error: `Failed to read file: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
 				});
 			}
 		};
@@ -358,7 +371,9 @@ export function mergeGraphs(
 			...node,
 			nodeId: newNodeId,
 			// Update children references
-			children: node.children.map((childId) => nodeIdMap.get(childId) || childId),
+			children: node.children.map(
+				(childId) => nodeIdMap.get(childId) || childId
+			),
 		};
 	}
 
@@ -376,7 +391,7 @@ export function mergeGraphs(
 		if (current.instances.length > 0) {
 			const currentPositions = current.instances.map((i) => i.position);
 			const maxX = Math.max(...currentPositions.map((p) => p.x));
-			
+
 			// Place imported graph to the right of current graph
 			finalOffsetX = maxX + 300 - minX;
 			finalOffsetY = -minY; // Center vertically relative to imported graph's center
@@ -388,18 +403,20 @@ export function mergeGraphs(
 	}
 
 	// Remap instances with new IDs and offset positions
-	const remappedInstances: NodeInstance[] = imported.instances.map((instance) => ({
-		...instance,
-		instanceId: instanceIdMap.get(instance.instanceId)!,
-		nodeId: nodeIdMap.get(instance.nodeId)!,
-		position: {
-			x: instance.position.x + finalOffsetX,
-			y: instance.position.y + finalOffsetY,
-		},
-		parentInstanceId: instance.parentInstanceId
-			? instanceIdMap.get(instance.parentInstanceId) || null
-			: null,
-	}));
+	const remappedInstances: NodeInstance[] = imported.instances.map(
+		(instance) => ({
+			...instance,
+			instanceId: instanceIdMap.get(instance.instanceId)!,
+			nodeId: nodeIdMap.get(instance.nodeId)!,
+			position: {
+				x: instance.position.x + finalOffsetX,
+				y: instance.position.y + finalOffsetY,
+			},
+			parentInstanceId: instance.parentInstanceId
+				? instanceIdMap.get(instance.parentInstanceId) || null
+				: null,
+		})
+	);
 
 	// Remap edges with new instance IDs
 	const remappedEdges: EdgeConnection[] = imported.edges.map((edge) => ({

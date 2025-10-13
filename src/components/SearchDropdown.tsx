@@ -69,7 +69,10 @@ export default function SearchDropdown({
 				selectedIndex
 			] as HTMLElement;
 			if (selectedElement) {
-				selectedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
+				selectedElement.scrollIntoView({
+					block: "nearest",
+					behavior: "smooth",
+				});
 			}
 		}
 	}, [selectedIndex]);
@@ -111,20 +114,27 @@ export default function SearchDropdown({
 	};
 
 	// Format path with immediate parent and child count
-	const formatNodeContext = (node: TreeNode, path: string[]): { parent: string; childCount: number } => {
+	const formatNodeContext = (
+		node: TreeNode,
+		path: string[]
+	): { parent: string; childCount: number } => {
 		// Get immediate parent (second to last in path, since last is the node itself)
 		const parent = path.length > 1 ? path[path.length - 2] : "";
-		
+
 		// Count children by finding instances of this node and checking their children
-		const nodeInstances = instances.filter(inst => inst.nodeId === node.nodeId);
+		const nodeInstances = instances.filter(
+			(inst) => inst.nodeId === node.nodeId
+		);
 		let childCount = 0;
-		
+
 		if (nodeInstances.length > 0) {
 			// Use the first instance to count children
 			const firstInstance = nodeInstances[0];
-			childCount = instances.filter(inst => inst.parentInstanceId === firstInstance.instanceId).length;
+			childCount = instances.filter(
+				(inst) => inst.parentInstanceId === firstInstance.instanceId
+			).length;
 		}
-		
+
 		return { parent, childCount };
 	};
 
@@ -138,7 +148,7 @@ export default function SearchDropdown({
 			{suggestions.map((node, index) => {
 				const path = getNodePath(node.nodeId, nodes, instances);
 				const { parent, childCount } = formatNodeContext(node, path);
-				
+
 				return (
 					<div
 						key={node.nodeId}
@@ -160,11 +170,7 @@ export default function SearchDropdown({
 								{childCount > 0 ? `${childCount} children` : "No children"}
 							</div>
 						</div>
-						{parent && (
-							<div className="dropdown-item-path">
-								in {parent}
-							</div>
-						)}
+						{parent && <div className="dropdown-item-path">in {parent}</div>}
 					</div>
 				);
 			})}

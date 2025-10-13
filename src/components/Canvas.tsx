@@ -246,13 +246,17 @@ export default function Canvas({
 			// Find all ancestors of the target node
 			const getAncestors = (instanceId: string): string[] => {
 				const ancestors: string[] = [];
-				let current = graph.instances.find((inst) => inst.instanceId === instanceId);
-				
+				let current = graph.instances.find(
+					(inst) => inst.instanceId === instanceId
+				);
+
 				while (current && current.parentInstanceId) {
 					ancestors.push(current.parentInstanceId);
-					current = graph.instances.find((inst) => inst.instanceId === current!.parentInstanceId);
+					current = graph.instances.find(
+						(inst) => inst.instanceId === current!.parentInstanceId
+					);
 				}
-				
+
 				return ancestors;
 			};
 
@@ -270,8 +274,8 @@ export default function Canvas({
 			});
 
 			// Check if we need to recalculate layout (if any ancestors were expanded)
-			const anyExpanded = updatedInstances.some((inst, idx) => 
-				inst.isCollapsed !== graph.instances[idx].isCollapsed
+			const anyExpanded = updatedInstances.some(
+				(inst, idx) => inst.isCollapsed !== graph.instances[idx].isCollapsed
 			);
 
 			if (anyExpanded) {
@@ -408,21 +412,22 @@ export default function Canvas({
 			if (text.startsWith("/") && !isHyperlinkMode) {
 				// Enter hyperlink mode
 				setIsHyperlinkMode(true);
-				
+
 				// Get query after "/"
 				const query = text.slice(1);
 				setHyperlinkQuery(query);
 
 				// Show all nodes initially or filtered if there's already a query
 				const currentNodeId = graph.nodes[editingInstance.nodeId].nodeId;
-				
+
 				if (query.trim()) {
 					// Search for matching nodes
 					const matchingNodeIds = searchTrie.current.search(query, 10);
 					const suggestions = Array.from(matchingNodeIds)
 						.map((nodeId) => graph.nodes[nodeId])
 						.filter(
-							(node) => node && node.nodeId !== currentNodeId && !node.hyperlinkTargetId
+							(node) =>
+								node && node.nodeId !== currentNodeId && !node.hyperlinkTargetId
 						)
 						.slice(0, 10);
 					setHyperlinkSuggestions(suggestions);
@@ -430,9 +435,9 @@ export default function Canvas({
 					// Show all available nodes
 					const allNodes = Object.values(graph.nodes)
 						.filter(
-							(node) => 
-								node && 
-								node.nodeId !== currentNodeId && 
+							(node) =>
+								node &&
+								node.nodeId !== currentNodeId &&
 								!node.hyperlinkTargetId &&
 								node.title &&
 								node.title.trim() !== ""
@@ -459,7 +464,8 @@ export default function Canvas({
 					const suggestions = Array.from(matchingNodeIds)
 						.map((nodeId) => graph.nodes[nodeId])
 						.filter(
-							(node) => node && node.nodeId !== currentNodeId && !node.hyperlinkTargetId
+							(node) =>
+								node && node.nodeId !== currentNodeId && !node.hyperlinkTargetId
 						)
 						.slice(0, 10);
 					setHyperlinkSuggestions(suggestions);
@@ -467,9 +473,9 @@ export default function Canvas({
 					// Show all available nodes when only "/" is present
 					const allNodes = Object.values(graph.nodes)
 						.filter(
-							(node) => 
-								node && 
-								node.nodeId !== currentNodeId && 
+							(node) =>
+								node &&
+								node.nodeId !== currentNodeId &&
 								!node.hyperlinkTargetId &&
 								node.title &&
 								node.title.trim() !== ""
@@ -522,9 +528,8 @@ export default function Canvas({
 
 			// Check if this node is a hyperlink and if the title has changed
 			// If title changed, break the hyperlink
-			const shouldBreakHyperlink = 
-				currentNode.hyperlinkTargetId && 
-				currentNode.title !== trimmedTitle;
+			const shouldBreakHyperlink =
+				currentNode.hyperlinkTargetId && currentNode.title !== trimmedTitle;
 
 			const updatedNode = {
 				...currentNode,
@@ -1589,7 +1594,7 @@ export default function Canvas({
 			<Background variant={BackgroundVariant.Dots} />
 			<Controls />
 			{/* <MiniMap /> */}
-			
+
 			{/* Hyperlink search dropdown */}
 			{isHyperlinkMode && (
 				<SearchDropdown
