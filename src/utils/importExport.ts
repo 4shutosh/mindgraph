@@ -183,7 +183,23 @@ function validateGraph(graph: MindGraph): string | null {
 			return `Node ${nodeId} has invalid children array`;
 		}
 
+		// Validate hyperlink target if present
+		if (node.hyperlinkTargetId !== undefined) {
+			if (typeof node.hyperlinkTargetId !== 'string') {
+				return `Node ${nodeId} has invalid hyperlinkTargetId type`;
+			}
+		}
+
 		nodeIds.add(nodeId);
+	}
+
+	// Validate hyperlink references after all nodes are collected
+	for (const [nodeId, node] of Object.entries(graph.nodes)) {
+		if (node.hyperlinkTargetId && !nodeIds.has(node.hyperlinkTargetId)) {
+			console.warn(`Node ${nodeId} has hyperlink to non-existent node ${node.hyperlinkTargetId}, will be removed`);
+			// Remove broken hyperlink reference
+			delete node.hyperlinkTargetId;
+		}
 	}
 
 	// Validate instances

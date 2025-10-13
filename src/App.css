@@ -138,6 +138,47 @@ body {
 	position: relative;
 }
 
+/* Hyperlink node styling - looks like normal node with link icon */
+.mind-node.hyperlink {
+	position: relative;
+}
+
+/* Link icon positioned at bottom right of node */
+.hyperlink-indicator {
+	position: absolute;
+	bottom: -8px;
+	right: -8px;
+	width: 20px;
+	height: 20px;
+	background: white;
+	border: 0.5px solid #78909C;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	font-size: 10px;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	transition: all 0.2s ease;
+	z-index: 10;
+}
+
+.hyperlink-indicator:hover {
+	background: #78909C;
+	transform: scale(1.1);
+	box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+}
+
+.hyperlink-indicator:hover::before {
+	color: white;
+}
+
+.hyperlink-indicator::before {
+	content: "🔗";
+	font-size: 10px;
+	line-height: 1;
+}
+
 /* Collapse/Expand button on node */
 .collapse-button {
 	position: absolute;

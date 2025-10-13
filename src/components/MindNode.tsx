@@ -17,6 +17,8 @@ export interface MindNodeData extends Record<string, unknown> {
 	collapsedCount?: number;
 	hasChildren?: boolean;
 	onToggleCollapse?: (instanceId: string) => void;
+	onHyperlinkClick?: (targetNodeId: string) => void;
+	isHyperlink?: boolean;
 }
 
 /**
@@ -38,6 +40,8 @@ function MindNode({ data, selected, id }: NodeProps) {
 		collapsedCount,
 		hasChildren,
 		onToggleCollapse,
+		onHyperlinkClick,
+		isHyperlink,
 	} = data as MindNodeData;
 	const contentRef = useRef<HTMLDivElement>(null);
 	const originalValueRef = useRef<string>(node.title);
@@ -51,6 +55,14 @@ function MindNode({ data, selected, id }: NodeProps) {
 		e.preventDefault();
 		if (onToggleCollapse) {
 			onToggleCollapse(id);
+		}
+	};
+
+	const handleHyperlinkClick = (e: React.MouseEvent) => {
+		e.stopPropagation();
+		e.preventDefault();
+		if (isHyperlink && node.hyperlinkTargetId && onHyperlinkClick) {
+			onHyperlinkClick(node.hyperlinkTargetId);
 		}
 	};
 
@@ -156,7 +168,7 @@ function MindNode({ data, selected, id }: NodeProps) {
 				isDragOver ? "drag-over" : ""
 			} ${isValidDropTarget ? "drop-target" : ""} ${
 				isDropTargetHovered ? "drop-target-hovered" : ""
-			} ${isCollapsed ? "collapsed" : ""}`}
+			} ${isCollapsed ? "collapsed" : ""} ${isHyperlink ? "hyperlink" : ""}`}
 			onMouseEnter={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}
 		>
@@ -211,6 +223,16 @@ function MindNode({ data, selected, id }: NodeProps) {
 						{isCollapsed && collapsedCount}
 					</div>
 				</div>
+			)}
+
+			{/* Hyperlink indicator icon - shown for hyperlinked nodes */}
+			{isHyperlink && (
+				<div
+					className="hyperlink-indicator"
+					onClick={handleHyperlinkClick}
+					onMouseDown={(e) => e.stopPropagation()}
+					title="Navigate to linked node"
+				/>
 			)}
 
 			<Handle

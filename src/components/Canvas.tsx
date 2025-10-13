@@ -15,7 +15,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { MindGraph } from "../types";
+import { MindGraph, TreeNode } from "../types";
 import {
 	createNode,
 	createNodeInstance,
@@ -26,9 +26,12 @@ import {
 	getFirstChildInstance,
 	getNextSiblingInstance,
 	getPreviousSiblingInstance,
+	getNodePath,
 } from "../utils/nodeHelpers";
 import { recalculateLayout } from "../utils/layoutHelpers";
 import MindNode, { MindNodeData } from "./MindNode";
+import SearchDropdown from "./SearchDropdown";
+import { NodeSearchTrie } from "../utils/trie";
 
 const nodeTypes: NodeTypes = {
 	mindNode: MindNode,
@@ -73,12 +76,35 @@ export default function Canvas({
 		Edge
 	> | null>(null);
 
+	// Hyperlinking state
+	const [isHyperlinkMode, setIsHyperlinkMode] = useState(false);
+	const [hyperlinkQuery, setHyperlinkQuery] = useState("");
+	const [hyperlinkSuggestions, setHyperlinkSuggestions] = useState<TreeNode[]>(
+		[]
+	);
+	const [dropdownPosition, setDropdownPosition] = useState<{
+		x: number;
+		y: number;
+	}>({ x: 0, y: 0 });
+	const searchTrie = useRef(new NodeSearchTrie());
+	const isSelectingHyperlinkRef = useRef(false); // Flag to prevent input events during selection
+
 	// Effect to trigger editing mode from parent
 	useEffect(() => {
 		if (instanceToEditId) {
 			setEditingInstanceId(instanceToEditId);
 		}
 	}, [instanceToEditId]);
+
+	// Rebuild the search trie whenever nodes change
+	useEffect(() => {
+		const nodesForTrie = Object.values(graph.nodes).filter(
+			(node) => node.title && node.title.trim() !== ""
+		);
+		searchTrie.current.rebuild(
+			Object.fromEntries(nodesForTrie.map((node) => [node.nodeId, node]))
+		);
+	}, [graph.nodes]);
 
 	// Helper: Check if reparenting would create a circular dependency
 	const wouldCreateCircularDependency = useCallback(
@@ -207,6 +233,269 @@ export default function Canvas({
 		[editingInstanceId, graph, onGraphChange]
 	);
 
+	// Handle hyperlink click - navigate to the target node
+	const handleHyperlinkClick = useCallback(
+		(targetNodeId: string) => {
+			// Find the first instance of the target node
+			const targetInstance = graph.instances.find(
+				(inst) => inst.nodeId === targetNodeId
+			);
+
+			if (!targetInstance) return;
+
+			// Find all ancestors of the target node
+			const getAncestors = (instanceId: string): string[] => {
+				const ancestors: string[] = [];
+				let current = graph.instances.find((inst) => inst.instanceId === instanceId);
+				
+				while (current && current.parentInstanceId) {
+					ancestors.push(current.parentInstanceId);
+					current = graph.instances.find((inst) => inst.instanceId === current!.parentInstanceId);
+				}
+				
+				return ancestors;
+			};
+
+			const ancestorIds = getAncestors(targetInstance.instanceId);
+
+			// Expand any collapsed ancestors
+			let updatedInstances = graph.instances.map((inst) => {
+				if (ancestorIds.includes(inst.instanceId) && inst.isCollapsed) {
+					return {
+						...inst,
+						isCollapsed: false,
+					};
+				}
+				return inst;
+			});
+
+			// Check if we need to recalculate layout (if any ancestors were expanded)
+			const anyExpanded = updatedInstances.some((inst, idx) => 
+				inst.isCollapsed !== graph.instances[idx].isCollapsed
+			);
+
+			if (anyExpanded) {
+				// Recalculate layout with expanded ancestors
+				updatedInstances = recalculateLayout(updatedInstances, graph.nodes);
+			}
+
+			// Update graph and focus on the target node
+			onGraphChange({
+				...graph,
+				instances: updatedInstances,
+				focusedInstanceId: targetInstance.instanceId,
+			});
+
+			// Pan to the target node after a short delay to allow layout recalculation
+			setTimeout(() => {
+				if (reactFlowInstance.current) {
+					const node = reactFlowInstance.current.getNode(
+						targetInstance.instanceId
+					);
+					if (node) {
+						const zoom = reactFlowInstance.current.getZoom();
+						reactFlowInstance.current.setCenter(
+							node.position.x + 75,
+							node.position.y + 20,
+							{ zoom, duration: 500 }
+						);
+					}
+				}
+			}, 100);
+		},
+		[graph, onGraphChange]
+	);
+
+	// Handle hyperlink selection from dropdown
+	const handleHyperlinkSelect = useCallback(
+		(selectedNode: TreeNode) => {
+			if (!editingInstanceId) return;
+
+			const editingInstance = graph.instances.find(
+				(inst) => inst.instanceId === editingInstanceId
+			);
+			if (!editingInstance) return;
+
+			const currentNode = graph.nodes[editingInstance.nodeId];
+
+			// Set flag to prevent input event processing
+			isSelectingHyperlinkRef.current = true;
+
+			// First, exit hyperlink mode to prevent further input processing
+			setIsHyperlinkMode(false);
+			setHyperlinkQuery("");
+			setHyperlinkSuggestions([]);
+
+			// Update the contentEditable element's text immediately
+			const contentEditableElement = document.querySelector(
+				'.node-title[contenteditable="true"]'
+			) as HTMLElement;
+			if (contentEditableElement) {
+				contentEditableElement.textContent = selectedNode.title;
+			}
+
+			// Update the node to be a hyperlink
+			const updatedNode: TreeNode = {
+				...currentNode,
+				title: selectedNode.title,
+				hyperlinkTargetId: selectedNode.nodeId,
+				updatedAt: Date.now(),
+			};
+
+			onGraphChange({
+				...graph,
+				nodes: { ...graph.nodes, [currentNode.nodeId]: updatedNode },
+			});
+
+			// Exit editing mode
+			setEditingInstanceId(null);
+
+			// Reset flag after a short delay
+			setTimeout(() => {
+				isSelectingHyperlinkRef.current = false;
+			}, 100);
+
+			// Ensure canvas regains focus
+			setTimeout(() => {
+				const canvasElement = document.querySelector(".react-flow");
+				if (canvasElement instanceof HTMLElement) {
+					canvasElement.focus();
+				}
+			}, 100);
+		},
+		[editingInstanceId, graph, onGraphChange]
+	);
+
+	// Close hyperlink dropdown
+	const closeHyperlinkDropdown = useCallback(() => {
+		setIsHyperlinkMode(false);
+		setHyperlinkQuery("");
+		setHyperlinkSuggestions([]);
+	}, []);
+
+	// Monitor contentEditable input for "/" trigger
+	useEffect(() => {
+		const handleInput = (e: Event) => {
+			// Skip if we're in the middle of selecting a hyperlink
+			if (isSelectingHyperlinkRef.current) {
+				return;
+			}
+
+			const target = e.target as HTMLElement;
+
+			// Only process if we're editing and the target is contentEditable
+			if (
+				!editingInstanceId ||
+				!target.isContentEditable ||
+				!target.classList.contains("node-title")
+			) {
+				return;
+			}
+
+			const editingInstance = graph.instances.find(
+				(inst) => inst.instanceId === editingInstanceId
+			);
+			if (!editingInstance) return;
+
+			// Don't allow hyperlinking for root nodes
+			if (editingInstance.parentInstanceId === null) {
+				return;
+			}
+
+			const text = target.textContent || "";
+
+			// Check if "/" was just typed
+			if (text.startsWith("/") && !isHyperlinkMode) {
+				// Enter hyperlink mode
+				setIsHyperlinkMode(true);
+				
+				// Get query after "/"
+				const query = text.slice(1);
+				setHyperlinkQuery(query);
+
+				// Show all nodes initially or filtered if there's already a query
+				const currentNodeId = graph.nodes[editingInstance.nodeId].nodeId;
+				
+				if (query.trim()) {
+					// Search for matching nodes
+					const matchingNodeIds = searchTrie.current.search(query, 10);
+					const suggestions = Array.from(matchingNodeIds)
+						.map((nodeId) => graph.nodes[nodeId])
+						.filter(
+							(node) => node && node.nodeId !== currentNodeId && !node.hyperlinkTargetId
+						)
+						.slice(0, 10);
+					setHyperlinkSuggestions(suggestions);
+				} else {
+					// Show all available nodes
+					const allNodes = Object.values(graph.nodes)
+						.filter(
+							(node) => 
+								node && 
+								node.nodeId !== currentNodeId && 
+								!node.hyperlinkTargetId &&
+								node.title &&
+								node.title.trim() !== ""
+						)
+						.slice(0, 10);
+					setHyperlinkSuggestions(allNodes);
+				}
+
+				// Calculate dropdown position relative to the node
+				const rect = target.getBoundingClientRect();
+				setDropdownPosition({
+					x: rect.left,
+					y: rect.bottom + 5,
+				});
+			} else if (isHyperlinkMode && text.startsWith("/")) {
+				// Continue hyperlink mode - extract query after "/"
+				const query = text.slice(1);
+				setHyperlinkQuery(query);
+
+				// Search for matching nodes (exclude the current node)
+				const currentNodeId = graph.nodes[editingInstance.nodeId].nodeId;
+				if (query.trim()) {
+					const matchingNodeIds = searchTrie.current.search(query, 10);
+					const suggestions = Array.from(matchingNodeIds)
+						.map((nodeId) => graph.nodes[nodeId])
+						.filter(
+							(node) => node && node.nodeId !== currentNodeId && !node.hyperlinkTargetId
+						)
+						.slice(0, 10);
+					setHyperlinkSuggestions(suggestions);
+				} else {
+					// Show all available nodes when only "/" is present
+					const allNodes = Object.values(graph.nodes)
+						.filter(
+							(node) => 
+								node && 
+								node.nodeId !== currentNodeId && 
+								!node.hyperlinkTargetId &&
+								node.title &&
+								node.title.trim() !== ""
+						)
+						.slice(0, 10);
+					setHyperlinkSuggestions(allNodes);
+				}
+
+				// Update dropdown position
+				const rect = target.getBoundingClientRect();
+				setDropdownPosition({
+					x: rect.left,
+					y: rect.bottom + 5,
+				});
+			} else if (isHyperlinkMode && !text.startsWith("/")) {
+				// User deleted the "/" - exit hyperlink mode
+				setIsHyperlinkMode(false);
+				setHyperlinkQuery("");
+				setHyperlinkSuggestions([]);
+			}
+		};
+
+		document.addEventListener("input", handleInput, true);
+		return () => document.removeEventListener("input", handleInput, true);
+	}, [editingInstanceId, graph, isHyperlinkMode]);
+
 	// Finish editing and save changes
 	const handleFinishEdit = useCallback(
 		(nodeId: string, newTitle: string, _widthDelta: number = 0) => {
@@ -228,10 +517,21 @@ export default function Canvas({
 				// (User can manually delete it later if needed)
 			}
 
+			const currentNode = graph.nodes[nodeId];
+			const trimmedTitle = newTitle.trim() || "(empty)";
+
+			// Check if this node is a hyperlink and if the title has changed
+			// If title changed, break the hyperlink
+			const shouldBreakHyperlink = 
+				currentNode.hyperlinkTargetId && 
+				currentNode.title !== trimmedTitle;
+
 			const updatedNode = {
-				...graph.nodes[nodeId],
-				title: newTitle.trim() || "(empty)", // Show placeholder for empty nodes with children
+				...currentNode,
+				title: trimmedTitle,
 				updatedAt: Date.now(),
+				// Remove hyperlinkTargetId if title changed
+				...(shouldBreakHyperlink ? { hyperlinkTargetId: undefined } : {}),
 			};
 
 			onGraphChange({
@@ -409,6 +709,9 @@ export default function Canvas({
 				const hasChildren =
 					getChildrenInstances(instance.instanceId, graph.instances).length > 0;
 
+				// Check if this node is a hyperlink
+				const isHyperlink = Boolean(treeNode.hyperlinkTargetId);
+
 				return {
 					id: instance.instanceId,
 					type: "mindNode",
@@ -429,6 +732,8 @@ export default function Canvas({
 						collapsedCount,
 						hasChildren,
 						onToggleCollapse: handleToggleCollapse,
+						onHyperlinkClick: handleHyperlinkClick,
+						isHyperlink,
 					},
 					selected: isFocused,
 					draggable: !isEditing && !isRoot, // Allow dragging non-root nodes when not editing
@@ -491,6 +796,7 @@ export default function Canvas({
 		handleCancelEdit,
 		handleWidthChange,
 		handleToggleCollapse,
+		handleHyperlinkClick,
 		setNodes,
 		setEdges,
 	]);
@@ -1283,6 +1589,19 @@ export default function Canvas({
 			<Background variant={BackgroundVariant.Dots} />
 			<Controls />
 			{/* <MiniMap /> */}
+			
+			{/* Hyperlink search dropdown */}
+			{isHyperlinkMode && (
+				<SearchDropdown
+					query={hyperlinkQuery}
+					suggestions={hyperlinkSuggestions}
+					position={dropdownPosition}
+					onSelect={handleHyperlinkSelect}
+					onClose={closeHyperlinkDropdown}
+					nodes={graph.nodes}
+					instances={graph.instances}
+				/>
+			)}
 		</ReactFlow>
 	);
 }

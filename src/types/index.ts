@@ -17,6 +17,9 @@ export interface TreeNode {
 
 	/** Child node IDs (references) */
 	children: string[];
+
+	/** If this node is a hyperlink, the target nodeId it links to */
+	hyperlinkTargetId?: string;
 }
 
 /**

@@ -147,3 +147,39 @@ export function getPreviousSiblingInstance(
 
 	return siblings.sort((a, b) => b.siblingOrder - a.siblingOrder)[0];
 }
+
+/**
+ * Get the breadcrumb path from root to a specific node
+ * Returns array of node titles in order from root to target
+ */
+export function getNodePath(
+	nodeId: string,
+	nodes: Record<string, TreeNode>,
+	instances: NodeInstance[]
+): string[] {
+	// Find the first instance of this node
+	const targetInstance = instances.find((inst) => inst.nodeId === nodeId);
+	if (!targetInstance) return [];
+
+	const path: string[] = [];
+	let currentInstance = targetInstance;
+
+	// Walk up the tree to build the path
+	while (currentInstance) {
+		const node = nodes[currentInstance.nodeId];
+		if (node) {
+			path.unshift(node.title); // Add to beginning of array
+		}
+
+		if (!currentInstance.parentInstanceId) break;
+
+		const parentInstance = instances.find(
+			(inst) => inst.instanceId === currentInstance.parentInstanceId
+		);
+		if (!parentInstance) break;
+
+		currentInstance = parentInstance;
+	}
+
+	return path;
+}
