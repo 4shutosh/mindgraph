@@ -147,3 +147,60 @@ export function getPreviousSiblingInstance(
 
 	return siblings.sort((a, b) => b.siblingOrder - a.siblingOrder)[0];
 }
+
+/**
+ * Get the breadcrumb path from root to a specific node
+ * Returns array of node titles in order from root to target
+ * 
+ * @param nodeId - The node ID to get the path for
+ * @param nodes - Map of all nodes
+ * @param instances - Array of all instances (used when instanceMap not provided)
+ * @param instanceMap - Optional pre-computed map for O(1) lookups
+ */
+export function getNodePath(
+	nodeId: string,
+	nodes: Record<string, TreeNode>,
+	instances: NodeInstance[],
+	instanceMap?: Map<string, NodeInstance>
+): string[] {
+	// Find the first instance of this node
+	let targetInstance: NodeInstance | undefined;
+	
+	if (instanceMap) {
+		// O(n) but only once to find first match
+		targetInstance = Array.from(instanceMap.values()).find(
+			(inst) => inst.nodeId === nodeId
+		);
+	} else {
+		// Fallback to array search
+		targetInstance = instances.find((inst) => inst.nodeId === nodeId);
+	}
+	
+	if (!targetInstance) return [];
+
+	const path: string[] = [];
+	let currentInstance = targetInstance;
+
+	// Walk up the tree to build the path
+	while (currentInstance) {
+		const node = nodes[currentInstance.nodeId];
+		if (node) {
+			path.unshift(node.title); // Add to beginning of array
+		}
+
+		if (!currentInstance.parentInstanceId) break;
+
+		// Use map for O(1) lookup if available, otherwise O(n) array search
+		const parentInstance = instanceMap
+			? instanceMap.get(currentInstance.parentInstanceId)
+			: instances.find(
+					(inst) => inst.instanceId === currentInstance.parentInstanceId
+			  );
+			
+		if (!parentInstance) break;
+
+		currentInstance = parentInstance;
+	}
+
+	return path;
+}

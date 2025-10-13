@@ -110,9 +110,24 @@ export function importGraph(jsonString: string): {
 			};
 		}
 
+		// Clean up broken hyperlinks (validateGraph marks them for cleanup)
+		const cleanedNodes: Record<string, TreeNode> = {};
+		for (const [nodeId, node] of Object.entries(data.graph.nodes)) {
+			// Create new node object, removing broken hyperlinks
+			if (node.hyperlinkTargetId && !data.graph.nodes[node.hyperlinkTargetId]) {
+				console.warn(
+					`Removing broken hyperlink from node ${nodeId} to ${node.hyperlinkTargetId}`
+				);
+				const { hyperlinkTargetId, ...nodeWithoutHyperlink } = node;
+				cleanedNodes[nodeId] = nodeWithoutHyperlink;
+			} else {
+				cleanedNodes[nodeId] = node;
+			}
+		}
+
 		// Ensure edges exist (for forward compatibility with v2.0 that may not have edges)
 		// If edges are missing or empty, derive them from instances
-		let finalGraph = data.graph;
+		let finalGraph = { ...data.graph, nodes: cleanedNodes };
 		if (!finalGraph.edges || finalGraph.edges.length === 0) {
 			console.log("Edges missing in import, deriving from instances...");
 			finalGraph = {
@@ -128,7 +143,9 @@ export function importGraph(jsonString: string): {
 	} catch (error) {
 		return {
 			success: false,
-			error: `Failed to parse JSON: ${error instanceof Error ? error.message : String(error)}`,
+			error: `Failed to parse JSON: ${
+				error instanceof Error ? error.message : String(error)
+			}`,
 		};
 	}
 }
@@ -183,7 +200,24 @@ function validateGraph(graph: MindGraph): string | null {
 			return `Node ${nodeId} has invalid children array`;
 		}
 
+		// Validate hyperlink target if present
+		if (node.hyperlinkTargetId !== undefined) {
+			if (typeof node.hyperlinkTargetId !== "string") {
+				return `Node ${nodeId} has invalid hyperlinkTargetId type`;
+			}
+		}
+
 		nodeIds.add(nodeId);
+	}
+
+	// Validate hyperlink references after all nodes are collected
+	// Don't mutate - just validate, cleanup happens in parseImportedJSON
+	for (const [nodeId, node] of Object.entries(graph.nodes)) {
+		if (node.hyperlinkTargetId && !nodeIds.has(node.hyperlinkTargetId)) {
+			console.warn(
+				`Node ${nodeId} has hyperlink to non-existent node ${node.hyperlinkTargetId}, will be cleaned up`
+			);
+		}
 	}
 
 	// Validate instances
@@ -197,11 +231,18 @@ function validateGraph(graph: MindGraph): string | null {
 			return `Instance ${instance.instanceId} references non-existent node ${instance.nodeId}`;
 		}
 
-		if (!instance.position || typeof instance.position.x !== "number" || typeof instance.position.y !== "number") {
+		if (
+			!instance.position ||
+			typeof instance.position.x !== "number" ||
+			typeof instance.position.y !== "number"
+		) {
 			return `Instance ${instance.instanceId} has invalid position`;
 		}
 
-		if (typeof instance.depth !== "number" || typeof instance.siblingOrder !== "number") {
+		if (
+			typeof instance.depth !== "number" ||
+			typeof instance.siblingOrder !== "number"
+		) {
 			return `Instance ${instance.instanceId} has invalid depth or siblingOrder`;
 		}
 
@@ -285,7 +326,9 @@ export function importGraphFromFile(): Promise<{
 			} catch (error) {
 				resolve({
 					success: false,
-					error: `Failed to read file: ${error instanceof Error ? error.message : String(error)}`,
+					error: `Failed to read file: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
 				});
 			}
 		};
@@ -342,7 +385,9 @@ export function mergeGraphs(
 			...node,
 			nodeId: newNodeId,
 			// Update children references
-			children: node.children.map((childId) => nodeIdMap.get(childId) || childId),
+			children: node.children.map(
+				(childId) => nodeIdMap.get(childId) || childId
+			),
 		};
 	}
 
@@ -360,7 +405,7 @@ export function mergeGraphs(
 		if (current.instances.length > 0) {
 			const currentPositions = current.instances.map((i) => i.position);
 			const maxX = Math.max(...currentPositions.map((p) => p.x));
-			
+
 			// Place imported graph to the right of current graph
 			finalOffsetX = maxX + 300 - minX;
 			finalOffsetY = -minY; // Center vertically relative to imported graph's center
@@ -372,18 +417,20 @@ export function mergeGraphs(
 	}
 
 	// Remap instances with new IDs and offset positions
-	const remappedInstances: NodeInstance[] = imported.instances.map((instance) => ({
-		...instance,
-		instanceId: instanceIdMap.get(instance.instanceId)!,
-		nodeId: nodeIdMap.get(instance.nodeId)!,
-		position: {
-			x: instance.position.x + finalOffsetX,
-			y: instance.position.y + finalOffsetY,
-		},
-		parentInstanceId: instance.parentInstanceId
-			? instanceIdMap.get(instance.parentInstanceId) || null
-			: null,
-	}));
+	const remappedInstances: NodeInstance[] = imported.instances.map(
+		(instance) => ({
+			...instance,
+			instanceId: instanceIdMap.get(instance.instanceId)!,
+			nodeId: nodeIdMap.get(instance.nodeId)!,
+			position: {
+				x: instance.position.x + finalOffsetX,
+				y: instance.position.y + finalOffsetY,
+			},
+			parentInstanceId: instance.parentInstanceId
+				? instanceIdMap.get(instance.parentInstanceId) || null
+				: null,
+		})
+	);
 
 	// Remap edges with new instance IDs
 	const remappedEdges: EdgeConnection[] = imported.edges.map((edge) => ({
