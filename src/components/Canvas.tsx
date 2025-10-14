@@ -106,9 +106,7 @@ export default function Canvas({
 	// Pre-compute instance lookup map for performance
 	const instanceMap = useMemo(() => {
 		const map = new Map<string, NodeInstance>();
-		graph.instances.forEach((inst) =>
-			map.set(inst.instanceId, inst)
-		);
+		graph.instances.forEach((inst) => map.set(inst.instanceId, inst));
 		return map;
 	}, [graph.instances]);
 
@@ -654,7 +652,129 @@ export default function Canvas({
 			});
 		},
 		[graph, onGraphChange]
-	); // Convert graph data to React Flow format
+	);
+
+	// Create a child node for a specific instance (used by indicator button click)
+	const handleCreateChildFor = useCallback(
+		(parentInstanceId: string) => {
+			const parentInstance = graph.instances.find(
+				(inst) => inst.instanceId === parentInstanceId
+			);
+			if (!parentInstance) return;
+
+			const newNode = createNode();
+			const existingChildren = getChildrenInstances(
+				parentInstance.instanceId,
+				graph.instances
+			);
+
+			// Create new instance with temporary position (will be recalculated)
+			const newInstance = createNodeInstance(
+				newNode.nodeId,
+				{ x: 0, y: 0 }, // Temporary position
+				parentInstance.instanceId,
+				parentInstance.depth + 1,
+				existingChildren.length
+			);
+
+			// Add the new instance
+			const instancesWithNew = [...graph.instances, newInstance];
+
+			// Apply d3 layout to calculate proper positions
+			const layoutedInstances = recalculateLayout(instancesWithNew, {
+				...graph.nodes,
+				[newNode.nodeId]: newNode,
+			});
+
+			// Create edge from parent to child
+			const newEdge = createEdge(
+				parentInstance.instanceId,
+				newInstance.instanceId
+			);
+
+			const updatedGraph: MindGraph = {
+				...graph,
+				nodes: { ...graph.nodes, [newNode.nodeId]: newNode },
+				instances: layoutedInstances,
+				edges: [...graph.edges, newEdge],
+				focusedInstanceId: newInstance.instanceId,
+			};
+
+			onGraphChange(updatedGraph);
+			// Start editing immediately
+			setTimeout(() => {
+				setEditingInstanceId(newInstance.instanceId);
+			}, 50);
+		},
+		[graph, onGraphChange]
+	);
+
+	// Create a sibling node for a specific instance (used by ghost node click)
+	const handleCreateSiblingFor = useCallback(
+		(siblingInstanceId: string) => {
+			const currentInstance = graph.instances.find(
+				(inst) => inst.instanceId === siblingInstanceId
+			);
+			if (!currentInstance) return;
+
+			const newNode = createNode();
+
+			// Create new instance with temporary position (will be recalculated)
+			const newInstance = createNodeInstance(
+				newNode.nodeId,
+				{ x: 0, y: 0 }, // Temporary position
+				currentInstance.parentInstanceId,
+				currentInstance.depth,
+				currentInstance.siblingOrder + 1 // Insert right after current instance
+			);
+
+			// Update sibling orders for nodes that come after
+			const updatedInstances = graph.instances.map((inst) => {
+				if (
+					inst.parentInstanceId === currentInstance.parentInstanceId &&
+					inst.siblingOrder > currentInstance.siblingOrder
+				) {
+					return { ...inst, siblingOrder: inst.siblingOrder + 1 };
+				}
+				return inst;
+			});
+
+			// Add the new instance
+			const instancesWithNew = [...updatedInstances, newInstance];
+
+			// Apply d3 layout to calculate proper positions
+			const layoutedInstances = recalculateLayout(instancesWithNew, {
+				...graph.nodes,
+				[newNode.nodeId]: newNode,
+			});
+
+			// Create edge from parent to new sibling
+			const newEdges = [...graph.edges];
+			if (currentInstance.parentInstanceId) {
+				newEdges.push(
+					createEdge(currentInstance.parentInstanceId, newInstance.instanceId)
+				);
+			}
+
+			const updatedGraph: MindGraph = {
+				...graph,
+				nodes: { ...graph.nodes, [newNode.nodeId]: newNode },
+				instances: layoutedInstances,
+				edges: newEdges,
+				rootNodeId: graph.rootNodeId || newNode.nodeId,
+				focusedInstanceId: newInstance.instanceId,
+			};
+
+			onGraphChange(updatedGraph);
+			// Start editing immediately
+			setTimeout(() => {
+				setEditingInstanceId(newInstance.instanceId);
+			}, 50);
+		},
+		[graph, onGraphChange]
+	);
+
+	// Convert graph data to React Flow format
 	const syncGraphToFlow = useCallback(() => {
 		// Helper: Get all instances that should be hidden (descendants of collapsed nodes)
 		const getHiddenInstanceIds = (): Set<string> => {
@@ -738,6 +858,9 @@ export default function Canvas({
 				// Check if this node is a hyperlink
 				const isHyperlink = Boolean(treeNode.hyperlinkTargetId);
 
+				// Check if multiple nodes are selected (for hiding UI elements)
+				const isMultipleSelected = selectedNodeIds.size > 1;
+
 				return {
 					id: instance.instanceId,
 					type: "mindNode",
@@ -761,6 +884,13 @@ export default function Canvas({
 						onHyperlinkClick: handleHyperlinkClick,
 						isHyperlink,
 						isHyperlinkMode,
+						isMultipleSelected,
+						onCreateChild: !isHyperlink
+							? () => handleCreateChildFor(instance.instanceId)
+							: undefined,
+						onCreateSibling: instance.parentInstanceId
+							? () => handleCreateSiblingFor(instance.instanceId)
+							: undefined,
 					},
 					selected: isFocused,
 					draggable: !isEditing && !isRoot, // Allow dragging non-root nodes when not editing
@@ -824,6 +954,8 @@ export default function Canvas({
 		handleWidthChange,
 		handleToggleCollapse,
 		handleHyperlinkClick,
+		handleCreateChildFor,
+		handleCreateSiblingFor,
 		setNodes,
 		setEdges,
 	]);

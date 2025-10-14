@@ -24,6 +24,15 @@ export interface MindNodeData extends Record<string, unknown> {
 	 * Used to control keyboard event handling during hyperlink creation.
 	 */
 	isHyperlinkMode?: boolean;
+	/**
+	 * Callbacks for creating child and sibling nodes via indicator buttons
+	 */
+	onCreateChild?: () => void;
+	onCreateSibling?: () => void;
+	/**
+	 * Whether multiple nodes are currently selected (hides UI elements)
+	 */
+	isMultipleSelected?: boolean;
 }
 
 /**
@@ -48,6 +57,9 @@ function MindNode({ data, selected, id }: NodeProps) {
 		onHyperlinkClick,
 		isHyperlink,
 		isHyperlinkMode,
+		onCreateChild,
+		onCreateSibling,
+		isMultipleSelected,
 	} = data as MindNodeData;
 	const contentRef = useRef<HTMLDivElement>(null);
 	const originalValueRef = useRef<string>(node.title);
@@ -222,22 +234,25 @@ function MindNode({ data, selected, id }: NodeProps) {
 				{node.title}
 			</div>
 
-			{/* Collapse/Expand button - shown on hover or when collapsed */}
-			{hasChildren && (isHovered || isCollapsed) && (
-				<div
-					className="collapse-button"
-					onClick={handleToggleClick}
-					onMouseDown={(e) => e.stopPropagation()}
-				>
+			{/* Collapse/Expand button - shown on hover, selected, or when collapsed (but not when editing or multiple selected) */}
+			{hasChildren &&
+				(isHovered || selected || isCollapsed) &&
+				!isEditing &&
+				!isMultipleSelected && (
 					<div
-						className={`collapse-button-circle ${
-							isCollapsed ? "collapsed" : ""
-						}`}
+						className="collapse-button"
+						onClick={handleToggleClick}
+						onMouseDown={(e) => e.stopPropagation()}
 					>
-						{isCollapsed && collapsedCount}
+						<div
+							className={`collapse-button-circle ${
+								isCollapsed ? "collapsed" : ""
+							}`}
+						>
+							{isCollapsed && collapsedCount}
+						</div>
 					</div>
-				</div>
-			)}
+				)}
 
 			{/* Hyperlink indicator icon - shown for hyperlinked nodes */}
 			{isHyperlink && (
@@ -247,6 +262,40 @@ function MindNode({ data, selected, id }: NodeProps) {
 					onMouseDown={(e) => e.stopPropagation()}
 					title="Navigate to linked node"
 				/>
+			)}
+
+			{/* Create child indicator button - shown on selected (not for hyperlinks or when editing) */}
+			{!isEditing &&
+				!isHyperlink &&
+				onCreateChild &&
+				selected &&
+				!isMultipleSelected && (
+					<div
+						className="create-child-indicator"
+						onClick={(e) => {
+							e.stopPropagation();
+							onCreateChild();
+						}}
+						onMouseDown={(e) => e.stopPropagation()}
+						title="Create child node (Tab)"
+					>
+						<div className="indicator-circle">+</div>
+					</div>
+				)}
+
+			{/* Create sibling indicator button - shown on selected (not when editing) */}
+			{!isEditing && onCreateSibling && selected && !isMultipleSelected && (
+				<div
+					className="create-sibling-indicator"
+					onClick={(e) => {
+						e.stopPropagation();
+						onCreateSibling();
+					}}
+					onMouseDown={(e) => e.stopPropagation()}
+					title="Create sibling node (Enter)"
+				>
+					<div className="indicator-circle">+</div>
+				</div>
 			)}
 
 			<Handle

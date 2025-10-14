@@ -185,7 +185,7 @@ body {
 	right: -12px;
 	top: 50%;
 	transform: translateY(-50%);
-	z-index: 100;
+	z-index: 101; /* Higher than create indicators */
 	cursor: pointer;
 	pointer-events: all;
 	padding-left: 6px;
@@ -210,7 +210,7 @@ body {
 .collapse-button-circle:hover {
 	border-color: #9ca3af;
 	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-	transform: scale(1.05);
+	transform: scale(1.1);
 }
 
 .collapse-button-circle.collapsed {
@@ -223,6 +223,36 @@ body {
 .collapse-button-circle.collapsed:hover {
 	border-color: #9ca3af;
 	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Create child indicator button - appears on right side of node */
+.create-child-indicator {
+	position: absolute;
+	right: -20px; /* Further out to avoid collision with collapse button */
+	top: 50%;
+	transform: translateY(-50%);
+	z-index: 100;
+	cursor: pointer;
+	pointer-events: all;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	/* Larger padding for easier hover/click */
+	padding: 8px;
+	margin: -8px;
+}
+
+/* Adjust position when collapse button is visible to avoid exact overlap */
+.mind-node:hover .create-child-indicator {
+	opacity: 1;
+}
+
+.mind-node.selected .create-child-indicator {
+	opacity: 1;
+}
+
+/* Keep create-child visible when hovering over the indicator itself */
+.create-child-indicator:hover {
+	opacity: 1 !important;
 }
 
 .node-title {
@@ -462,4 +492,104 @@ kbd {
 	background: rgba(59, 130, 246, 0.12) !important;
 	box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2),
 		0 4px 12px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Create child indicator button - appears on right side of node */
+.create-child-indicator {
+	position: absolute;
+	right: -48px; /* Further out with space for line */
+	top: 72%;
+	transform: translateY(-50%);
+	z-index: 99; /* Slightly below collapse button */
+	cursor: pointer;
+	pointer-events: all;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	/* Larger padding for easier hover/click */
+	padding: 8px;
+	margin: -8px;
+}
+
+/* Dotted line connecting node to create-child indicator */
+.create-child-indicator::before {
+	content: "";
+	position: absolute;
+	right: 24px; /* Start from edge of button circle */
+	top: 50%; /* Align with center of node (button is already centered at node edge) */
+	transform: translateY(-50%);
+	width: 28px; /* Length of horizontal line */
+	height: 0;
+	border-top: 1px dashed #d1d5db;
+	pointer-events: none;
+}
+
+/* When node has children (collapse button visible), position create-child slightly differently */
+.mind-node.child-node .create-child-indicator {
+	right: -48px;
+	/* Same position but different z-index ensures both are accessible */
+}
+
+/* Show create-child indicator only when node is selected */
+.mind-node.selected .create-child-indicator {
+	opacity: 1;
+}
+
+/* Create sibling indicator button - appears on bottom of node */
+.create-sibling-indicator {
+	position: absolute;
+	bottom: -48px; /* Further down with space for line */
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 100;
+	cursor: pointer;
+	pointer-events: all;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	/* Larger padding for easier hover/click */
+	padding: 8px;
+	margin: -8px;
+}
+
+/* Dotted line connecting node to create-sibling indicator */
+.create-sibling-indicator::before {
+	content: "";
+	position: absolute;
+	left: 50%; /* Align with center of node (button is already centered at node edge) */
+	transform: translateX(-50%);
+	bottom: 24px; /* Start from edge of button circle */
+	width: 0;
+	height: 28px; /* Length of vertical line */
+	border-left: 1px dashed #d1d5db;
+	pointer-events: none;
+}
+
+/* Show create-sibling indicator only when node is selected */
+.mind-node.selected .create-sibling-indicator {
+	opacity: 1;
+}
+
+/* Shared indicator circle styling - matches collapse button theme */
+.indicator-circle {
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: white;
+	border: 2px solid #d1d5db;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 12px;
+	font-weight: 600;
+	color: #6b7280;
+	line-height: 1;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+	transition: all 0.2s ease;
+}
+
+.indicator-circle:hover {
+	border-color: #9ca3af;
+	background: white;
+	color: #374151;
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+	transform: scale(1.1);
 }
