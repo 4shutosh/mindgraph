@@ -30,6 +30,7 @@ import {
 import { recalculateLayout } from "../utils/layoutHelpers";
 import MindNode, { MindNodeData } from "./MindNode";
 import SearchDropdown from "./SearchDropdown";
+import ConfirmDialog from "./ConfirmDialog";
 import { NodeSearchTrie } from "../utils/trie";
 
 const nodeTypes: NodeTypes = {
@@ -91,6 +92,15 @@ export default function Canvas({
 	const searchTrie = useRef(new NodeSearchTrie());
 	const isSelectingHyperlinkRef = useRef(false); // Flag to prevent input events during selection
 
+	// Confirmation dialog state
+	const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+	const [confirmDialogData, setConfirmDialogData] = useState<{
+		title: string;
+		message: string;
+		onConfirm: () => void;
+	} | null>(null);
+	const pendingDeletionRef = useRef<Set<string> | null>(null);
+
 	// Pre-compute child counts for performance (used in dropdown)
 	const childCountsMap = useMemo(() => {
 		const counts = new Map<string, number>();
@@ -127,6 +137,20 @@ export default function Canvas({
 		);
 	}, [graph.nodes]);
 
+	// Helper: Find all nodes that have hyperlinks pointing to the given nodeIds
+	const findHyperlinkedNodes = useCallback(
+		(nodeIds: Set<string>): TreeNode[] => {
+			const hyperlinkedNodes: TreeNode[] = [];
+			Object.values(graph.nodes).forEach((node) => {
+				if (node.hyperlinkTargetId && nodeIds.has(node.hyperlinkTargetId)) {
+					hyperlinkedNodes.push(node);
+				}
+			});
+			return hyperlinkedNodes;
+		},
+		[graph.nodes]
+	);
+
 	// Helper: Check if reparenting would create a circular dependency
 	const wouldCreateCircularDependency = useCallback(
 		(draggedInstanceId: string, newParentInstanceId: string): boolean => {
@@ -162,10 +186,26 @@ export default function Canvas({
 				...descendants.map((d) => d.instanceId),
 			]);
 
-			// Filter out deleted instances
+			// Check for hyperlinks before deletion
 			const remainingInstances = graph.instances.filter(
 				(inst) => !instanceIdsToDelete.has(inst.instanceId)
 			);
+			const remainingNodeIds = new Set(
+				remainingInstances.map((inst) => inst.nodeId)
+			);
+
+			// Get nodeIds that will be deleted
+			const nodeIdsToDelete = new Set<string>();
+			Object.keys(graph.nodes).forEach((nodeId) => {
+				if (!remainingNodeIds.has(nodeId)) {
+					nodeIdsToDelete.add(nodeId);
+				}
+			});
+
+			// Check if any nodes have hyperlinks pointing to nodes being deleted
+			// Note: For single instance deletion (e.g., canceling edit), we silently convert
+			// hyperlinks without showing a dialog for better UX
+			// findHyperlinkedNodes(nodeIdsToDelete); // Hyperlinks will be handled below
 
 			// Filter out edges connected to deleted instances
 			const remainingEdges = graph.edges.filter(
@@ -174,35 +214,41 @@ export default function Canvas({
 					!instanceIdsToDelete.has(edge.target)
 			);
 
-			// Find which nodes are no longer referenced by any remaining instance
-			const remainingNodeIds = new Set(
-				remainingInstances.map((inst) => inst.nodeId)
-			);
-
-			// Keep only nodes that still have at least one instance
-			const remainingNodes: Record<string, (typeof graph.nodes)[string]> = {};
+			// Update nodes: convert hyperlinked nodes to regular copies
+			const updatedNodes: Record<string, TreeNode> = {};
 			Object.entries(graph.nodes).forEach(([nodeId, node]) => {
 				if (remainingNodeIds.has(nodeId)) {
-					remainingNodes[nodeId] = node;
+					const isHyperlinkedToDeleted =
+						node.hyperlinkTargetId && nodeIdsToDelete.has(node.hyperlinkTargetId);
+
+					if (isHyperlinkedToDeleted) {
+						const { hyperlinkTargetId, ...nodeWithoutHyperlink } = node;
+						updatedNodes[nodeId] = {
+							...nodeWithoutHyperlink,
+							updatedAt: Date.now(),
+						};
+					} else {
+						updatedNodes[nodeId] = node;
+					}
 				}
 			});
 
 			// Recalculate layout for remaining nodes
 			const layoutedInstances = recalculateLayout(
 				remainingInstances,
-				remainingNodes
+				updatedNodes
 			);
 
 			onGraphChange({
 				...graph,
-				nodes: remainingNodes,
+				nodes: updatedNodes,
 				instances: layoutedInstances,
 				edges: remainingEdges,
 				focusedInstanceId: null,
 			});
 			setEditingInstanceId(null);
 		},
-		[graph, onGraphChange]
+		[graph, onGraphChange, findHyperlinkedNodes]
 	);
 
 	// Check if a specific instance has any children
@@ -1218,12 +1264,100 @@ export default function Canvas({
 		}
 	}, [graph, onGraphChange]);
 
+	// Helper: Perform the actual deletion after confirmation
+	const performDeletion = useCallback(
+		(instancesToDelete: Set<string>) => {
+			console.log('[DEBUG] performDeletion called with', instancesToDelete.size, 'instances');
+			
+			// Filter out deleted instances
+			const remainingInstances = graph.instances.filter(
+				(inst) => !instancesToDelete.has(inst.instanceId)
+			);
+
+			// Filter out edges connected to deleted instances
+			const remainingEdges = graph.edges.filter(
+				(edge) =>
+					!instancesToDelete.has(edge.source) &&
+					!instancesToDelete.has(edge.target)
+			);
+
+			// Find which nodes are being deleted (no longer referenced by any remaining instance)
+			const remainingNodeIds = new Set(
+				remainingInstances.map((inst) => inst.nodeId)
+			);
+			
+			// Get nodeIds that will be deleted
+			const nodeIdsToDelete = new Set<string>();
+			Object.keys(graph.nodes).forEach((nodeId) => {
+				if (!remainingNodeIds.has(nodeId)) {
+					nodeIdsToDelete.add(nodeId);
+				}
+			});
+
+			// Convert hyperlinked nodes into regular copies (break the hyperlink)
+			const updatedNodes: Record<string, TreeNode> = {};
+			Object.entries(graph.nodes).forEach(([nodeId, node]) => {
+				if (remainingNodeIds.has(nodeId)) {
+					// Check if this node is hyperlinked to a deleted node
+					const isHyperlinkedToDeleted =
+						node.hyperlinkTargetId && nodeIdsToDelete.has(node.hyperlinkTargetId);
+
+					if (isHyperlinkedToDeleted) {
+						// Remove the hyperlink, converting it to a regular node copy
+						const { hyperlinkTargetId, ...nodeWithoutHyperlink } = node;
+						updatedNodes[nodeId] = {
+							...nodeWithoutHyperlink,
+							updatedAt: Date.now(),
+						};
+					} else {
+						updatedNodes[nodeId] = node;
+					}
+				}
+			});
+
+			// Recalculate layout for remaining nodes
+			const layoutedInstances = recalculateLayout(
+				remainingInstances,
+				updatedNodes
+			);
+
+			// Update graph
+			const updatedGraph = {
+				...graph,
+				nodes: updatedNodes,
+				instances: layoutedInstances,
+				edges: remainingEdges,
+				focusedInstanceId:
+					graph.focusedInstanceId &&
+					instancesToDelete.has(graph.focusedInstanceId)
+						? null
+						: graph.focusedInstanceId,
+			};
+
+			onGraphChange(updatedGraph);
+
+			// Clear editing state if deleted node was being edited
+			if (editingInstanceId && instancesToDelete.has(editingInstanceId)) {
+				setEditingInstanceId(null);
+			}
+		},
+		[graph, onGraphChange, editingInstanceId, findHyperlinkedNodes]
+	);
+
 	// Delete selected nodes and their subtrees
 	const handleDeleteNodes = useCallback(() => {
 		// Use our tracked selection state
 		if (selectedNodeIds.size === 0) {
 			return;
 		}
+
+		// Prevent deletion if dialog is already showing
+		if (showConfirmDialog) {
+			console.log('[DEBUG] handleDeleteNodes called but dialog already open, aborting');
+			return;
+		}
+
+		console.log('[DEBUG] handleDeleteNodes: Starting deletion check');
 
 		const selectedInstanceIds = Array.from(selectedNodeIds);
 
@@ -1235,53 +1369,65 @@ export default function Canvas({
 			descendants.forEach((d) => instancesToDelete.add(d.instanceId));
 		});
 
-		// Filter out deleted instances
+		// Find which nodes will be deleted (no longer referenced by any remaining instance)
 		const remainingInstances = graph.instances.filter(
 			(inst) => !instancesToDelete.has(inst.instanceId)
 		);
-
-		// Filter out edges connected to deleted instances
-		const remainingEdges = graph.edges.filter(
-			(edge) =>
-				!instancesToDelete.has(edge.source) &&
-				!instancesToDelete.has(edge.target)
-		);
-
-		// Find which nodes are no longer referenced by any instance
 		const remainingNodeIds = new Set(
 			remainingInstances.map((inst) => inst.nodeId)
 		);
-		const remainingNodes: Record<string, (typeof graph.nodes)[string]> = {};
-		Object.entries(graph.nodes).forEach(([nodeId, node]) => {
-			if (remainingNodeIds.has(nodeId)) {
-				remainingNodes[nodeId] = node;
+
+		// Get nodeIds that will be deleted
+		const nodeIdsToDelete = new Set<string>();
+		Object.keys(graph.nodes).forEach((nodeId) => {
+			if (!remainingNodeIds.has(nodeId)) {
+				nodeIdsToDelete.add(nodeId);
 			}
 		});
 
-		// Recalculate layout for remaining nodes
-		const layoutedInstances = recalculateLayout(
-			remainingInstances,
-			remainingNodes
-		);
+		// Check if any nodes have hyperlinks pointing to nodes being deleted
+		const hyperlinkedNodes = findHyperlinkedNodes(nodeIdsToDelete);
 
-		// Update graph
-		const updatedGraph = {
-			...graph,
-			nodes: remainingNodes,
-			instances: layoutedInstances,
-			edges: remainingEdges,
-			focusedInstanceId:
-				graph.focusedInstanceId &&
-				instancesToDelete.has(graph.focusedInstanceId)
-					? null
-					: graph.focusedInstanceId,
-		};
+		if (hyperlinkedNodes.length > 0) {
+			// Show confirmation dialog
+			const nodeCount = nodeIdsToDelete.size;
+			const hyperlinkCount = hyperlinkedNodes.length;
+			const message = `You are about to delete ${nodeCount} node${
+				nodeCount > 1 ? "s" : ""
+			}.\n\nWarning: ${hyperlinkCount} hyperlinked node${
+				hyperlinkCount > 1 ? "s" : ""
+			} refer${
+				hyperlinkCount > 1 ? "" : "s"
+			} the current node${nodeCount > 1 ? "s" : ""} being deleted.\n\nThese hyperlinked nodes will be converted to regular copies to maintain tree integrity.\n\nDo you want to proceed?`;
 
-		onGraphChange(updatedGraph); // Clear editing state if deleted node was being edited
-		if (editingInstanceId && instancesToDelete.has(editingInstanceId)) {
-			setEditingInstanceId(null);
+			console.log('[DEBUG] Showing dialog, storing pending deletion');
+			pendingDeletionRef.current = instancesToDelete;
+			setConfirmDialogData({
+				title: "Delete Node with Hyperlinks",
+				message,
+				onConfirm: () => {
+					console.log('[DEBUG] User confirmed deletion');
+					if (pendingDeletionRef.current) {
+						performDeletion(pendingDeletionRef.current);
+						pendingDeletionRef.current = null;
+					}
+					setShowConfirmDialog(false);
+					setConfirmDialogData(null);
+				},
+			});
+			setShowConfirmDialog(true);
+		} else {
+			// No hyperlinks, proceed with deletion directly
+			console.log('[DEBUG] No hyperlinks, deleting directly');
+			performDeletion(instancesToDelete);
 		}
-	}, [selectedNodeIds, graph, onGraphChange, editingInstanceId]);
+	}, [
+		selectedNodeIds,
+		graph,
+		findHyperlinkedNodes,
+		performDeletion,
+		showConfirmDialog,
+	]);
 
 	// Global keyboard event listener for React Flow v12 compatibility
 	// Note: React Flow v12 changed how onKeyDown events are handled internally.
@@ -1313,6 +1459,11 @@ export default function Canvas({
 
 			// Ignore if hyperlink dropdown is open (let SearchDropdown handle keyboard events)
 			if (isHyperlinkMode) {
+				return;
+			}
+
+			// Ignore if confirmation dialog is open
+			if (showConfirmDialog) {
 				return;
 			}
 
@@ -1378,6 +1529,7 @@ export default function Canvas({
 		handleDeleteNodes,
 		editingInstanceId,
 		isHyperlinkMode,
+		showConfirmDialog,
 	]);
 
 	// Handle node drag start
@@ -1749,6 +1901,7 @@ export default function Canvas({
 			nodesFocusable={true}
 			edgesFocusable={false}
 			disableKeyboardA11y={false}
+			deleteKeyCode={null}
 			tabIndex={0}
 		>
 			<Background variant={BackgroundVariant.Dots} />
@@ -1767,6 +1920,24 @@ export default function Canvas({
 					instances={graph.instances}
 					childCountsMap={childCountsMap}
 					instanceMap={instanceMap}
+				/>
+			)}
+
+			{/* Confirmation dialog for hyperlink deletion */}
+			{showConfirmDialog && confirmDialogData && (
+				<ConfirmDialog
+					isOpen={showConfirmDialog}
+					title={confirmDialogData.title}
+					message={confirmDialogData.message}
+					onConfirm={confirmDialogData.onConfirm}
+					onCancel={() => {
+						console.log('[DEBUG] User cancelled deletion');
+						setShowConfirmDialog(false);
+						setConfirmDialogData(null);
+						pendingDeletionRef.current = null;
+					}}
+					confirmText="Delete"
+					cancelText="Cancel"
 				/>
 			)}
 		</ReactFlow>
