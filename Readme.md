@@ -1,10 +1,10 @@
-# MindGraph - WIP
+# ThinkItOut - WIP
 
 I was building a knowledge based decision tree, where a set of decisions kept re appearing - in which copying the entire subtree for each was not viable. I could not find any tool which does linking of nodes in a clean fashion.
 
 Here is my attempt to solve that usecase. This will be a keyboard first mindgraph - a mindmap where you can hyperlink nodes - so a graph :)
 
-![mindgraph-demo](demo.png)
+![thinkitout-demo](demo.png)
 
 ### Installation
 

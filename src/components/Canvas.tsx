@@ -219,7 +219,8 @@ export default function Canvas({
 			Object.entries(graph.nodes).forEach(([nodeId, node]) => {
 				if (remainingNodeIds.has(nodeId)) {
 					const isHyperlinkedToDeleted =
-						node.hyperlinkTargetId && nodeIdsToDelete.has(node.hyperlinkTargetId);
+						node.hyperlinkTargetId &&
+						nodeIdsToDelete.has(node.hyperlinkTargetId);
 
 					if (isHyperlinkedToDeleted) {
 						const { hyperlinkTargetId, ...nodeWithoutHyperlink } = node;
@@ -1267,8 +1268,12 @@ export default function Canvas({
 	// Helper: Perform the actual deletion after confirmation
 	const performDeletion = useCallback(
 		(instancesToDelete: Set<string>) => {
-			console.log('[DEBUG] performDeletion called with', instancesToDelete.size, 'instances');
-			
+			console.log(
+				"[DEBUG] performDeletion called with",
+				instancesToDelete.size,
+				"instances"
+			);
+
 			// Filter out deleted instances
 			const remainingInstances = graph.instances.filter(
 				(inst) => !instancesToDelete.has(inst.instanceId)
@@ -1285,7 +1290,7 @@ export default function Canvas({
 			const remainingNodeIds = new Set(
 				remainingInstances.map((inst) => inst.nodeId)
 			);
-			
+
 			// Get nodeIds that will be deleted
 			const nodeIdsToDelete = new Set<string>();
 			Object.keys(graph.nodes).forEach((nodeId) => {
@@ -1300,7 +1305,8 @@ export default function Canvas({
 				if (remainingNodeIds.has(nodeId)) {
 					// Check if this node is hyperlinked to a deleted node
 					const isHyperlinkedToDeleted =
-						node.hyperlinkTargetId && nodeIdsToDelete.has(node.hyperlinkTargetId);
+						node.hyperlinkTargetId &&
+						nodeIdsToDelete.has(node.hyperlinkTargetId);
 
 					if (isHyperlinkedToDeleted) {
 						// Remove the hyperlink, converting it to a regular node copy
@@ -1353,11 +1359,13 @@ export default function Canvas({
 
 		// Prevent deletion if dialog is already showing
 		if (showConfirmDialog) {
-			console.log('[DEBUG] handleDeleteNodes called but dialog already open, aborting');
+			console.log(
+				"[DEBUG] handleDeleteNodes called but dialog already open, aborting"
+			);
 			return;
 		}
 
-		console.log('[DEBUG] handleDeleteNodes: Starting deletion check');
+		console.log("[DEBUG] handleDeleteNodes: Starting deletion check");
 
 		const selectedInstanceIds = Array.from(selectedNodeIds);
 
@@ -1396,17 +1404,17 @@ export default function Canvas({
 				nodeCount > 1 ? "s" : ""
 			}.\n\nWarning: ${hyperlinkCount} hyperlinked node${
 				hyperlinkCount > 1 ? "s" : ""
-			} refer${
-				hyperlinkCount > 1 ? "" : "s"
-			} the current node${nodeCount > 1 ? "s" : ""} being deleted.\n\nThese hyperlinked nodes will be converted to regular copies to maintain tree integrity.\n\nDo you want to proceed?`;
+			} refer${hyperlinkCount > 1 ? "" : "s"} the current node${
+				nodeCount > 1 ? "s" : ""
+			} being deleted.\n\nThese hyperlinked nodes will be converted to regular copies to maintain tree integrity.\n\nDo you want to proceed?`;
 
-			console.log('[DEBUG] Showing dialog, storing pending deletion');
+			console.log("[DEBUG] Showing dialog, storing pending deletion");
 			pendingDeletionRef.current = instancesToDelete;
 			setConfirmDialogData({
 				title: "Delete Node with Hyperlinks",
 				message,
 				onConfirm: () => {
-					console.log('[DEBUG] User confirmed deletion');
+					console.log("[DEBUG] User confirmed deletion");
 					if (pendingDeletionRef.current) {
 						performDeletion(pendingDeletionRef.current);
 						pendingDeletionRef.current = null;
@@ -1418,7 +1426,7 @@ export default function Canvas({
 			setShowConfirmDialog(true);
 		} else {
 			// No hyperlinks, proceed with deletion directly
-			console.log('[DEBUG] No hyperlinks, deleting directly');
+			console.log("[DEBUG] No hyperlinks, deleting directly");
 			performDeletion(instancesToDelete);
 		}
 	}, [
@@ -1931,7 +1939,7 @@ export default function Canvas({
 					message={confirmDialogData.message}
 					onConfirm={confirmDialogData.onConfirm}
 					onCancel={() => {
-						console.log('[DEBUG] User cancelled deletion');
+						console.log("[DEBUG] User cancelled deletion");
 						setShowConfirmDialog(false);
 						setConfirmDialogData(null);
 						pendingDeletionRef.current = null;

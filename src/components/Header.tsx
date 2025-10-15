@@ -16,7 +16,7 @@ const Header: React.FC<HeaderProps> = ({
 	return (
 		<header className="app-header">
 			<div className="flex flex-col header-left">
-				<h1>MindGraph</h1>
+				<h1>ThinkItOut</h1>
 				<p className="subtitle">
 					Build, study, and evolve your knowledge graph
 				</p>
