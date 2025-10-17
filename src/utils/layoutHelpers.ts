@@ -170,7 +170,7 @@ export function applyBalancedLayout(
 
 	const positions = new Map<string, { x: number; y: number }>();
 	const trees = buildHierarchyTree(instances, nodes);
-	
+
 	// Store original root positions to preserve custom positioning
 	const rootPositions = new Map<string, { x: number; y: number }>();
 	trees.forEach((tree) => {
@@ -179,7 +179,7 @@ export function applyBalancedLayout(
 
 	trees.forEach((tree) => {
 		const root = hierarchy<HierarchyNode>(tree, (d) => d.children);
-		
+
 		// Use the root's current position instead of default start position
 		const rootPos = rootPositions.get(tree.instanceId) || {
 			x: LAYOUT_CONFIG.startX,

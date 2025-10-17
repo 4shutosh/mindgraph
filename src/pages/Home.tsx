@@ -43,24 +43,25 @@ function Home() {
 	// Create a new node
 	const handleCreateNode = useCallback(() => {
 		const newNode = createNode();
-		
+
 		// Find all existing root nodes (depth 0) and calculate position for new root
-		const existingRoots = graph.instances.filter(inst => inst.depth === 0);
+		const existingRoots = graph.instances.filter((inst) => inst.depth === 0);
 		let newX = 100; // Default starting X position
 		let newY = 100; // Default starting Y position
-		
+
 		if (existingRoots.length > 0) {
 			// Find the rightmost root node
-			const rightmostRoot = existingRoots.reduce((max, inst) => 
-				inst.position.x > max.position.x ? inst : max
-			, existingRoots[0]);
-			
+			const rightmostRoot = existingRoots.reduce(
+				(max, inst) => (inst.position.x > max.position.x ? inst : max),
+				existingRoots[0]
+			);
+
 			// Place new root 600px to the right of the rightmost root
 			// This gives enough space for the tree to expand without overlap
 			newX = rightmostRoot.position.x + 600;
 			newY = rightmostRoot.position.y; // Keep same Y position for alignment
 		}
-		
+
 		const instance = createNodeInstance(
 			newNode.nodeId,
 			{
