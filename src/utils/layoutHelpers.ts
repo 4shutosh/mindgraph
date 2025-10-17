@@ -170,10 +170,21 @@ export function applyBalancedLayout(
 
 	const positions = new Map<string, { x: number; y: number }>();
 	const trees = buildHierarchyTree(instances, nodes);
-	let currentOffsetY = LAYOUT_CONFIG.startY;
+	
+	// Store original root positions to preserve custom positioning
+	const rootPositions = new Map<string, { x: number; y: number }>();
+	trees.forEach((tree) => {
+		rootPositions.set(tree.instanceId, tree.instance.position);
+	});
 
 	trees.forEach((tree) => {
 		const root = hierarchy<HierarchyNode>(tree, (d) => d.children);
+		
+		// Use the root's current position instead of default start position
+		const rootPos = rootPositions.get(tree.instanceId) || {
+			x: LAYOUT_CONFIG.startX,
+			y: LAYOUT_CONFIG.startY,
+		};
 
 		// Count nodes to determine reasonable tree height
 		let nodeCount = 0;
@@ -259,6 +270,17 @@ export function applyBalancedLayout(
 		// All nodes at the same depth get the same X position
 		const CONSTANT_HORIZONTAL_SPACING = 240; // Fixed spacing between levels
 
+		// Find the root node's position in the d3 layout to calculate offset
+		let rootLayoutY = 0;
+		layoutRoot.each((node: HierarchyPointNode<HierarchyNode>) => {
+			if (node.data.instanceId === tree.instanceId) {
+				rootLayoutY = node.x;
+			}
+		});
+
+		// Calculate offset to keep root at its original position
+		const yOffset = rootPos.y - rootLayoutY;
+
 		layoutRoot.each((node: HierarchyPointNode<HierarchyNode>) => {
 			// Calculate depth (distance from root)
 			let depth = 0;
@@ -268,16 +290,15 @@ export function applyBalancedLayout(
 				tempNode = tempNode.parent;
 			}
 
-			// X position = startX + (depth × constant spacing)
-			const xPos = LAYOUT_CONFIG.startX + depth * CONSTANT_HORIZONTAL_SPACING;
+			// X position = root's X + (depth × constant spacing)
+			// Y position = d3's calculated Y + offset to maintain root's original position
+			const xPos = rootPos.x + depth * CONSTANT_HORIZONTAL_SPACING;
 
 			positions.set(node.data.instanceId, {
 				x: xPos,
-				y: node.x + currentOffsetY,
+				y: node.x + yOffset,
 			});
 		});
-
-		currentOffsetY += treeHeight + LAYOUT_CONFIG.verticalSpacing * 2;
 	});
 
 	return instances.map((instance) => {

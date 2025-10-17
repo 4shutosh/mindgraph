@@ -881,6 +881,9 @@ export default function Canvas({
 						instance.parentInstanceId === draggingInstance.parentInstanceId &&
 						instance.instanceId !== draggingNodeId
 					) {
+						// Create node map for O(1) position lookups (performance optimization)
+						const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
 						// Get all siblings excluding the dragging node, sorted by Y position
 						const otherSiblings = graph.instances
 							.filter(
@@ -889,8 +892,8 @@ export default function Canvas({
 									inst.instanceId !== draggingNodeId
 							)
 							.sort((a, b) => {
-								const nodeA = nodes.find((n) => n.id === a.instanceId);
-								const nodeB = nodes.find((n) => n.id === b.instanceId);
+								const nodeA = nodeMap.get(a.instanceId);
+								const nodeB = nodeMap.get(b.instanceId);
 								return (nodeA?.position.y ?? 0) - (nodeB?.position.y ?? 0);
 							});
 
@@ -958,7 +961,7 @@ export default function Canvas({
 							: undefined,
 					},
 					selected: isFocused,
-					draggable: !isEditing && !isRoot, // Allow dragging non-root nodes when not editing
+					draggable: !isEditing, // Allow dragging all nodes when not editing (including roots)
 				};
 			});
 
@@ -1581,6 +1584,14 @@ export default function Canvas({
 			);
 			if (!draggingInstance) return;
 
+			// Root nodes can be freely positioned - no reorder/reparent logic needed
+			if (draggingInstance.parentInstanceId === null) {
+				setIsDraggingForReparent(false);
+				setPotentialDropParentId(null);
+				setTargetDropOrder(null);
+				return;
+			}
+
 			// Calculate movements from start position
 			const horizontalMovement = Math.abs(node.position.x - dragStartPos.x);
 			const verticalMovement = Math.abs(node.position.y - dragStartPos.y);
@@ -1743,7 +1754,7 @@ export default function Canvas({
 
 	// Handle node drag stop - reorder siblings OR reparent if needed
 	const handleNodeDragStop = useCallback(
-		(_event: React.MouseEvent, _node: Node) => {
+		(_event: React.MouseEvent, node: Node) => {
 			// Get the dragging instance before clearing state
 			const draggingInstance = graph.instances.find(
 				(inst) => inst.instanceId === draggingNodeId
@@ -1763,6 +1774,46 @@ export default function Canvas({
 
 			// Validate we have all required data
 			if (!draggingInstance) {
+				return;
+			}
+
+			// ROOT NODE: Just update position, no reordering needed
+			if (draggingInstance.parentInstanceId === null && draggingNodeId) {
+				const updatedInstances = graph.instances.map((inst) => {
+					if (inst.instanceId === draggingNodeId) {
+						return {
+							...inst,
+							position: {
+								x: node.position.x,
+								y: node.position.y,
+							},
+						};
+					}
+					return inst;
+				});
+
+				// Update all descendants positions relative to the root's new position
+				const descendants = getAllDescendants(draggingNodeId, graph.instances);
+				const deltaX = node.position.x - draggingInstance.position.x;
+				const deltaY = node.position.y - draggingInstance.position.y;
+
+				const finalInstances = updatedInstances.map((inst) => {
+					if (descendants.some((d) => d.instanceId === inst.instanceId)) {
+						return {
+							...inst,
+							position: {
+								x: inst.position.x + deltaX,
+								y: inst.position.y + deltaY,
+							},
+						};
+					}
+					return inst;
+				});
+
+				onGraphChange({
+					...graph,
+					instances: finalInstances,
+				});
 				return;
 			}
 
