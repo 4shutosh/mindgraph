@@ -7,9 +7,11 @@ interface ProtectedRouteProps {
 
 // Detect if device is mobile
 const isMobileDevice = () => {
-	return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-		navigator.userAgent
-	) || window.innerWidth < 768;
+	return (
+		/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+			navigator.userAgent
+		) || window.innerWidth < 768
+	);
 };
 
 // Desktop-only route - redirects mobile users to /landing

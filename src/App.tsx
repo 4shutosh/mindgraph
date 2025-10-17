@@ -1,4 +1,9 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+	BrowserRouter as Router,
+	Routes,
+	Route,
+	Navigate,
+} from "react-router-dom";
 import Home from "./pages/Home";
 import Landing from "./pages/Landing";
 import { DesktopOnlyRoute } from "./routes/ProtectedRoute";
@@ -17,10 +22,10 @@ function App() {
 						</DesktopOnlyRoute>
 					}
 				/>
-				
+
 				{/* Mobile landing page */}
 				<Route path="/landing" element={<Landing />} />
-				
+
 				{/* Catch all - redirect to home */}
 				<Route path="*" element={<Navigate to="/" replace />} />
 			</Routes>

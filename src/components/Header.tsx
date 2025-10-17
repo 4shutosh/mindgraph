@@ -7,11 +7,11 @@ interface HeaderProps {
 	onImport: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-	onNewNode, 
+const Header: React.FC<HeaderProps> = ({
+	onNewNode,
 	onToggleShortcuts,
 	onExport,
-	onImport 
+	onImport,
 }) => {
 	return (
 		<header className="app-header">
@@ -28,15 +28,15 @@ const Header: React.FC<HeaderProps> = ({
 					</button>
 				</div>
 				<div className="button-group">
-					<button 
-						className="btn btn-secondary" 
+					<button
+						className="btn btn-secondary"
 						onClick={onImport}
 						title="Import graph from JSON file"
 					>
 						Import
 					</button>
-					<button 
-						className="btn btn-secondary" 
+					<button
+						className="btn btn-secondary"
 						onClick={onExport}
 						title="Export graph to JSON file"
 					>
