@@ -878,10 +878,28 @@ export default function Canvas({
 					);
 					if (
 						draggingInstance &&
-						instance.parentInstanceId === draggingInstance.parentInstanceId
+						instance.parentInstanceId === draggingInstance.parentInstanceId &&
+						instance.instanceId !== draggingNodeId
 					) {
-						// Highlight the node that's currently at the target drop position
-						isDragOver = instance.siblingOrder === targetDropOrder;
+						// Get all siblings excluding the dragging node, sorted by Y position
+						const otherSiblings = graph.instances
+							.filter(
+								(inst) =>
+									inst.parentInstanceId === draggingInstance.parentInstanceId &&
+									inst.instanceId !== draggingNodeId
+							)
+							.sort((a, b) => {
+								const nodeA = nodes.find((n) => n.id === a.instanceId);
+								const nodeB = nodes.find((n) => n.id === b.instanceId);
+								return (nodeA?.position.y ?? 0) - (nodeB?.position.y ?? 0);
+							});
+
+						// Highlight the sibling that will be at the target position after the drop
+						const targetIndex = targetDropOrder;
+						if (targetIndex < otherSiblings.length) {
+							// Highlight the sibling at the target index (the dragged node will be inserted before it)
+							isDragOver = instance.instanceId === otherSiblings[targetIndex].instanceId;
+						}
 					}
 				}
 
@@ -1565,9 +1583,10 @@ export default function Canvas({
 
 			// Calculate movements from start position
 			const horizontalMovement = Math.abs(node.position.x - dragStartPos.x);
+			const verticalMovement = Math.abs(node.position.y - dragStartPos.y);
 
-			// NEW LOGIC: Check if we're hovering over a potential drop target
-			// This allows sibling-to-child reparenting even with vertical movement
+			// IMPROVED LOGIC: Check if we're hovering over a potential drop target
+			// Need to be smart about depth 1+ where nodes are vertically close
 			let hoveringOverValidTarget = false;
 
 			// Check if we're near any node that's NOT a sibling
@@ -1588,25 +1607,48 @@ export default function Canvas({
 				);
 				if (!targetNode) return;
 
-				// Check if we're hovering near this node
-				const distance = Math.sqrt(
-					Math.pow(targetNode.position.x - node.position.x, 2) +
-						Math.pow(targetNode.position.y - node.position.y, 2)
+				// Calculate horizontal and vertical distances separately
+				const horizontalDist = Math.abs(targetNode.position.x - node.position.x);
+				const verticalDist = Math.abs(targetNode.position.y - node.position.y);
+				const totalDistance = Math.sqrt(
+					Math.pow(horizontalDist, 2) + Math.pow(verticalDist, 2)
 				);
 
-				const HOVER_THRESHOLD = 150; // Distance to consider "hovering over"
-				if (distance < HOVER_THRESHOLD) {
-					hoveringOverValidTarget = true;
+				// For nodes at the same depth (potential cousins), require horizontal movement
+				// to avoid false reparent detection when just reordering siblings
+				const isSameDepth = instance.depth === draggingInstance.depth;
+				const HOVER_THRESHOLD = 150;
+				const SAME_DEPTH_HORIZONTAL_THRESHOLD = 80; // Need to move horizontally to reparent cousins
+
+				if (isSameDepth) {
+					// At same depth: only consider reparenting if there's significant horizontal movement
+					if (
+						totalDistance < HOVER_THRESHOLD &&
+						horizontalDist > SAME_DEPTH_HORIZONTAL_THRESHOLD
+					) {
+						hoveringOverValidTarget = true;
+					}
+				} else {
+					// Different depth: normal hover detection
+					if (totalDistance < HOVER_THRESHOLD) {
+						hoveringOverValidTarget = true;
+					}
 				}
 			});
 
 			// DETECTION LOGIC:
-			// 1. If hovering over a valid non-sibling target -> REPARENT MODE
-			// 2. Else if significant horizontal movement -> REPARENT MODE (for general reparenting)
+			// 1. If hovering over a valid non-sibling target with appropriate movement -> REPARENT MODE
+			// 2. Else if significant horizontal movement (not just vertical) -> REPARENT MODE
 			// 3. Else -> REORDER MODE (vertical reordering of siblings)
 			const REPARENT_THRESHOLD = 100;
+			
+			// Prefer reorder mode if movement is primarily vertical
+			const isPrimarylyVertical = verticalMovement > horizontalMovement * 2;
+			const hasSignificantHorizontalMovement = horizontalMovement > REPARENT_THRESHOLD;
+			
 			const isReparentMode =
-				hoveringOverValidTarget || horizontalMovement > REPARENT_THRESHOLD;
+				(hoveringOverValidTarget && !isPrimarylyVertical) ||
+				hasSignificantHorizontalMovement;
 			setIsDraggingForReparent(isReparentMode);
 
 			if (isReparentMode) {
@@ -1648,32 +1690,44 @@ export default function Canvas({
 				// REORDER MODE: Determine vertical position among siblings
 				setPotentialDropParentId(null); // Clear reparent target
 
-				// Get all siblings (including the dragging node) sorted by their Y position
-				const allSiblings = graph.instances
+				// Get all siblings (excluding the dragging node) sorted by their current siblingOrder
+				const otherSiblings = graph.instances
 					.filter(
 						(inst) =>
-							inst.parentInstanceId === draggingInstance.parentInstanceId
+							inst.parentInstanceId === draggingInstance.parentInstanceId &&
+							inst.instanceId !== draggingNodeId
 					)
 					.map((inst) => {
 						const rfNode = reactFlowInstance.current?.getNode(inst.instanceId);
-						return { instance: inst, yPos: rfNode?.position.y ?? 0 };
+						return {
+							instance: inst,
+							yPos: rfNode?.position.y ?? 0,
+							order: inst.siblingOrder,
+						};
 					})
 					.sort((a, b) => a.yPos - b.yPos);
 
-				// Find where the dragged node would be inserted based on its current Y position
+				// Find where the dragged node should be inserted based on Y position
 				const draggedY = node.position.y;
 				let newOrder = 0;
 
-				for (let i = 0; i < allSiblings.length; i++) {
-					const sibling = allSiblings[i];
-
-					// Skip the dragging node itself in the comparison
-					if (sibling.instance.instanceId === draggingNodeId) continue;
-
-					// If dragged position is below this sibling, increment target order
-					if (draggedY > sibling.yPos) {
-						newOrder++;
+				// Find the first sibling whose Y position is greater than dragged Y
+				for (let i = 0; i < otherSiblings.length; i++) {
+					const sibling = otherSiblings[i];
+					if (draggedY < sibling.yPos) {
+						// Insert before this sibling
+						newOrder = i;
+						break;
 					}
+					// If we've checked all siblings and dragged Y is below all of them
+					if (i === otherSiblings.length - 1) {
+						newOrder = otherSiblings.length;
+					}
+				}
+
+				// If there are no other siblings, order should be 0
+				if (otherSiblings.length === 0) {
+					newOrder = 0;
 				}
 
 				setTargetDropOrder(newOrder);
