@@ -33,6 +33,10 @@ export interface MindNodeData extends Record<string, unknown> {
 	 * Whether multiple nodes are currently selected (hides UI elements)
 	 */
 	isMultipleSelected?: boolean;
+	/**
+	 * Callback for handling context menu (right-click) on root node
+	 */
+	onContextMenu?: (event: React.MouseEvent, instanceId: string) => void;
 }
 
 /**
@@ -60,6 +64,7 @@ function MindNode({ data, selected, id }: NodeProps) {
 		onCreateChild,
 		onCreateSibling,
 		isMultipleSelected,
+		onContextMenu,
 	} = data as MindNodeData;
 	const contentRef = useRef<HTMLDivElement>(null);
 	const originalValueRef = useRef<string>(node.title);
@@ -185,6 +190,15 @@ function MindNode({ data, selected, id }: NodeProps) {
 		}
 	};
 
+	const handleContextMenu = (e: React.MouseEvent) => {
+		// Only show context menu for root nodes
+		if (isRoot && onContextMenu) {
+			e.preventDefault();
+			e.stopPropagation();
+			onContextMenu(e, id);
+		}
+	};
+
 	return (
 		<div
 			ref={nodeRef}
@@ -197,6 +211,8 @@ function MindNode({ data, selected, id }: NodeProps) {
 			} ${isCollapsed ? "collapsed" : ""} ${isHyperlink ? "hyperlink" : ""}`}
 			onMouseEnter={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}
+			onContextMenu={handleContextMenu}
+			data-is-root={isRoot}
 		>
 			{/* Handle positioning: center for root, sides for children */}
 			<Handle

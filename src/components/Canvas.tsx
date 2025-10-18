@@ -31,7 +31,9 @@ import { recalculateLayout } from "../utils/layoutHelpers";
 import MindNode, { MindNodeData } from "./MindNode";
 import SearchDropdown from "./SearchDropdown";
 import ConfirmDialog from "./ConfirmDialog";
+import ContextMenu from "./ContextMenu";
 import { NodeSearchTrie } from "../utils/trie";
+import { copyTreeAsImage } from "../utils/imageExport";
 
 const nodeTypes: NodeTypes = {
 	mindNode: MindNode,
@@ -100,6 +102,12 @@ export default function Canvas({
 		onConfirm: () => void;
 	} | null>(null);
 	const pendingDeletionRef = useRef<Set<string> | null>(null);
+
+	// Context menu state
+	const [contextMenu, setContextMenu] = useState<{
+		position: { x: number; y: number };
+		instanceId: string;
+	} | null>(null);
 
 	// Pre-compute child counts for performance (used in dropdown)
 	const childCountsMap = useMemo(() => {
@@ -821,6 +829,48 @@ export default function Canvas({
 		[graph, onGraphChange]
 	);
 
+	// Handle context menu on root node
+	const handleContextMenu = useCallback(
+		(event: React.MouseEvent, instanceId: string) => {
+			event.preventDefault();
+			event.stopPropagation();
+			
+			setContextMenu({
+				position: { x: event.clientX, y: event.clientY },
+				instanceId,
+			});
+		},
+		[]
+	);
+
+	// Handle copy tree as image
+	const handleCopyAsImage = useCallback(async () => {
+		// Close context menu first
+		setContextMenu(null);
+		
+		try {
+			// Wait a bit for context menu to close and DOM to update
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			
+			await copyTreeAsImage({
+				backgroundColor: null, // Transparent background
+				scale: 2,
+			});
+
+			console.log("✅ Tree copied to clipboard!");
+			alert("✅ Tree copied to clipboard!");
+		} catch (error) {
+			console.error("❌ Failed to copy tree as image:", error);
+			const errorMessage = error instanceof Error ? error.message : "Unknown error";
+			alert(`Failed to copy tree as image:\n${errorMessage}\n\nCheck console for details.`);
+		}
+	}, []);
+
+	// Close context menu
+	const handleCloseContextMenu = useCallback(() => {
+		setContextMenu(null);
+	}, []);
+
 	// Convert graph data to React Flow format
 	const syncGraphToFlow = useCallback(() => {
 		// Helper: Get all instances that should be hidden (descendants of collapsed nodes)
@@ -960,6 +1010,7 @@ export default function Canvas({
 						onCreateSibling: instance.parentInstanceId
 							? () => handleCreateSiblingFor(instance.instanceId)
 							: undefined,
+						onContextMenu: handleContextMenu,
 					},
 					selected: isFocused,
 					draggable: !isEditing, // Allow dragging all nodes when not editing (including roots)
@@ -2055,6 +2106,21 @@ export default function Canvas({
 					}}
 					confirmText="Delete"
 					cancelText="Cancel"
+				/>
+			)}
+
+			{/* Context menu for root node */}
+			{contextMenu && (
+				<ContextMenu
+					items={[
+						{
+							label: "Copy as Image",
+							icon: "📋",
+							onClick: handleCopyAsImage,
+						},
+					]}
+					position={contextMenu.position}
+					onClose={handleCloseContextMenu}
 				/>
 			)}
 		</ReactFlow>
