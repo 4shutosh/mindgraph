@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
 interface HeaderProps {
 	onNewNode: () => void;
@@ -13,9 +14,15 @@ const Header: React.FC<HeaderProps> = ({
 	onExport,
 	onImport,
 }) => {
+	const navigate = useNavigate();
+
+	const handleTitleClick = () => {
+		navigate("/landing");
+	};
+
 	return (
 		<header className="app-header">
-			<div className="flex flex-col header-left">
+			<div className="flex flex-col header-left header-clickable" onClick={handleTitleClick}>
 				<h1>ThinkItOut</h1>
 				<p className="subtitle">
 					Build, study, and evolve your knowledge graph
