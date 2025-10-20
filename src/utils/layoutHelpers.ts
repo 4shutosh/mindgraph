@@ -274,7 +274,8 @@ export function applyBalancedLayout(
 				// Child node: position based on parent's right edge + horizontal spacing
 				const parentId = node.parent.data.instanceId;
 				const parentXPos = positions.get(parentId)?.x || rootPos.x;
-				const parentWidth = node.parent.data.estimatedWidth || LAYOUT_CONFIG.nodeMaxWidth;
+				const parentWidth =
+					node.parent.data.estimatedWidth || LAYOUT_CONFIG.nodeMaxWidth;
 
 				// X = parent's right edge + spacing
 				// Parent's right edge = parentXPos + parentWidth
