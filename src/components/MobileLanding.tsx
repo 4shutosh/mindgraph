@@ -44,9 +44,10 @@ const MobileLanding: React.FC = () => {
 					) : (
 						<div className="desktop-notice">
 							<p>
-								This website is optimized for desktop use with keyboard navigation
-								and precise mouse interactions. Please open this website on a
-								desktop or laptop computer to get the full experience.
+								This website is optimized for desktop use with keyboard
+								navigation and precise mouse interactions. Please open this
+								website on a desktop or laptop computer to get the full
+								experience.
 							</p>
 						</div>
 					)}
