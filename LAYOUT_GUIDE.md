@@ -49,33 +49,37 @@ const LAYOUT_CONFIG = {
 
 All critical tuning variables are centralized in the `LAYOUT_CONFIG` object at the top of `layoutHelpers.ts`.
 
-### 1. **horizontalSpacing** (280px)
+### 1. **horizontalSpacing** (80px)
 
-**What it controls:** The horizontal distance between parent and child nodes at different depth levels.
+**What it controls:** The horizontal gap between a parent node's **right edge** and its child node's **left edge**. This creates **consistent visual edge lengths** regardless of the parent node's text length or width.
 
-**Current value:** `280px`
+**Current value:** `80px`
 
 **How to adjust:**
 
 ```typescript
 const LAYOUT_CONFIG = {
 	// ...
-	horizontalSpacing: 280, // Increase for more spacing, decrease for less
+	horizontalSpacing: 80, // Increase for more spacing, decrease for less
 	// ...
 };
 ```
 
+**How it works:**
+The system calculates each node's actual rendered width based on text content (considering word wrapping). Child nodes are positioned at: `parentX + parentWidth + horizontalSpacing`. This ensures edges always have the same visual length from right edge to left edge.
+
 **Impact:**
 
-- **Increase (e.g., 350px):** More space between parent/child, longer edges
-- **Decrease (e.g., 220px):** Tighter horizontal layout, shorter edges
-- ⚠️ **Warning:** Values below 220px may cause edge overlap with wide nodes (max-width: 400px)
+- **Increase (e.g., 120px):** More space between nodes, longer edges
+- **Decrease (e.g., 50px):** Tighter horizontal layout, shorter edges
+- **Consistent:** Edge length is now independent of parent node width
 
 **When to change:**
 
-- Graph feels too compressed horizontally
-- Edges are too long or too short
-- Text readability is affected by node proximity
+- Want more or less breathing room between connected nodes
+- Edges feel too short or too long
+- Need to fit more nodes horizontally on screen
+- Want to balance horizontal and vertical spacing
 
 ---
 

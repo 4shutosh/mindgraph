@@ -182,7 +182,7 @@ body {
 /* Collapse/Expand button on node */
 .collapse-button {
 	position: absolute;
-	right: -12px;
+	right: -16px;
 	top: 50%;
 	transform: translateY(-50%);
 	z-index: 101; /* Higher than create indicators */
@@ -192,15 +192,15 @@ body {
 }
 
 .collapse-button-circle {
-	width: 16px;
-	height: 16px;
+	width: 20px;
+	height: 20px;
 	border-radius: 50%;
 	background: white;
 	border: 2px solid #d1d5db;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-size: 9px;
+	font-size: 12px;
 	font-weight: 600;
 	color: #6b7280;
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
@@ -217,7 +217,7 @@ body {
 	background: white;
 	color: #6b7280;
 	border-color: #d1d5db;
-	font-size: 9px;
+	font-size: 12px;
 }
 
 .collapse-button-circle.collapsed:hover {

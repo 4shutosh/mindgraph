@@ -13,7 +13,7 @@ const LAYOUT_CONFIG = {
 	basePadding: 20, // Base padding around node content
 
 	// Spacing configuration
-	horizontalSpacing: 280, // Distance between parent and child depth levels (increased for wider nodes)
+	horizontalSpacing: 80, // Gap between parent's right edge and child's left edge
 	verticalSpacingMultiplier: 0.6, // Controls vertical compactness (smaller = tighter)
 	minVerticalSeparation: 0.01, // Minimum separation between sibling nodes
 
@@ -86,8 +86,9 @@ function estimateNodeWidth(text: string): number {
 		return LAYOUT_CONFIG.nodeMinWidth;
 	}
 
-	// More accurate character width estimation (matches estimateNodeHeight)
-	const avgCharWidth = 10;
+	// Character width estimation (matches estimateNodeHeight for consistency)
+	// Font is 1.2rem ≈ 19.2px, so average char width is ~11px
+	const avgCharWidth = 11;
 	const padding = 24; // Total horizontal padding (12px left + 12px right)
 	const maxCharsPerLine = Math.floor(LAYOUT_CONFIG.nodeMaxWidth / avgCharWidth);
 
@@ -260,18 +261,25 @@ export function applyBalancedLayout(
 		// Calculate offset to keep root at its original position
 		const yOffset = rootPos.y - rootLayoutY;
 
+		// D3's .each() traverses the tree in breadth-first order (level by level),
+		// ensuring parents are always positioned before their children.
+		// This guarantees that positions.get(parentId) will always return a valid position.
 		layoutRoot.each((node: HierarchyPointNode<HierarchyNode>) => {
-			// Calculate depth (distance from root)
-			let depth = 0;
-			let tempNode: HierarchyPointNode<HierarchyNode> | null = node.parent;
-			while (tempNode) {
-				depth++;
-				tempNode = tempNode.parent;
-			}
+			let xPos: number;
 
-			// X position = root's X + (depth × horizontal spacing from config)
-			// Y position = d3's calculated Y + offset to maintain root's original position
-			const xPos = rootPos.x + depth * LAYOUT_CONFIG.horizontalSpacing;
+			if (!node.parent) {
+				// Root node: use its original position
+				xPos = rootPos.x;
+			} else {
+				// Child node: position based on parent's right edge + horizontal spacing
+				const parentId = node.parent.data.instanceId;
+				const parentXPos = positions.get(parentId)?.x || rootPos.x;
+				const parentWidth = node.parent.data.estimatedWidth || LAYOUT_CONFIG.nodeMaxWidth;
+
+				// X = parent's right edge + spacing
+				// Parent's right edge = parentXPos + parentWidth
+				xPos = parentXPos + parentWidth + LAYOUT_CONFIG.horizontalSpacing;
+			}
 
 			positions.set(node.data.instanceId, {
 				x: xPos,
