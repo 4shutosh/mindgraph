@@ -256,14 +256,14 @@ body {
 }
 
 .node-title {
-	font-size: 0.95rem;
+	font-size: 1.2rem;
 	font-weight: 500;
 	color: #1f2937;
 	word-wrap: break-word;
 	word-break: break-word;
 	white-space: pre-wrap;
 	min-width: 20px;
-	max-width: 300px;
+	max-width: 400px;
 	min-height: 1.5rem;
 	cursor: text;
 	padding: 0;

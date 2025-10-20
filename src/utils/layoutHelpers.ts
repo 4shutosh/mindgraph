@@ -2,19 +2,24 @@ import { hierarchy, cluster, HierarchyPointNode } from "d3-hierarchy";
 import { NodeInstance, TreeNode } from "../types";
 
 /**
- * Layout configuration
+ * Layout configuration constants
+ * See docs/LAYOUT_SYSTEM.md for detailed explanation
  */
 const LAYOUT_CONFIG = {
-	horizontalSpacing: 200,
-	minHorizontalSpacing: 180, // Minimum spacing for sparse trees
-	maxHorizontalSpacing: 350, // Maximum spacing for dense trees
-	verticalSpacing: 75,
-	startX: 100,
-	startY: 100,
-	nodeMaxWidth: 300, // Match CSS max-width
+	// Node dimensions (must match CSS in App.css)
+	nodeMaxWidth: 400, // Maximum node width before text wraps
 	nodeMinWidth: 60, // Minimum node width
-	lineHeight: 24, // Match CSS line-height (1.5rem)
-	basePadding: 20, // Base padding for node (12px top + 12px bottom + some margin)
+	lineHeight: 24, // Line height for text (1.5rem = 24px)
+	basePadding: 20, // Base padding around node content
+
+	// Spacing configuration
+	horizontalSpacing: 280, // Distance between parent and child depth levels (increased for wider nodes)
+	verticalSpacingMultiplier: 0.6, // Controls vertical compactness (smaller = tighter)
+	minVerticalSeparation: 0.01, // Minimum separation between sibling nodes
+
+	// Tree positioning
+	startX: 100, // Default X position for root nodes
+	startY: 100, // Default Y position for root nodes
 };
 
 interface HierarchyNode {
@@ -28,26 +33,24 @@ interface HierarchyNode {
 
 /**
  * Estimate node height based on text content
- * This accounts for word wrapping within the max-width constraint
+ * Accounts for word wrapping within the max-width constraint
  */
 function estimateNodeHeight(text: string): number {
 	if (!text || text.trim().length === 0) {
 		return LAYOUT_CONFIG.lineHeight + LAYOUT_CONFIG.basePadding;
 	}
 
-	// More accurate character width estimation
-	const avgCharWidth = 10; // Increased to account for padding and varied characters
+	// Font is 1.2rem ≈ 19.2px, so average char width is ~11px (accounting for varied widths)
+	const avgCharWidth = 11;
 	const maxCharsPerLine = Math.floor(LAYOUT_CONFIG.nodeMaxWidth / avgCharWidth);
 
-	// Split by words to handle word wrapping properly
+	// Calculate number of lines by simulating word wrapping
 	const words = text.split(/\s+/);
 	let lines = 1;
 	let currentLineLength = 0;
 
 	for (const word of words) {
 		const wordLength = word.length;
-
-		// If adding this word would exceed the line, start a new line
 		if (
 			currentLineLength + wordLength + 1 > maxCharsPerLine &&
 			currentLineLength > 0
@@ -55,17 +58,21 @@ function estimateNodeHeight(text: string): number {
 			lines++;
 			currentLineLength = wordLength;
 		} else {
-			currentLineLength += wordLength + 1; // +1 for space
+			currentLineLength += wordLength + 1;
 		}
 	}
 
-	// Height = (number of lines * line height) + padding
-	// Add significantly more padding for multi-line nodes
+	// Calculate total height: (lines × line height) + base padding + extra padding for multi-line
+	// Add more padding for very tall nodes (5+ lines)
 	const extraPadding = lines > 1 ? 20 : 0;
+	const tallNodePadding = lines >= 5 ? 10 : 0;
 	const minHeight = LAYOUT_CONFIG.lineHeight + LAYOUT_CONFIG.basePadding;
 
 	return Math.max(
-		lines * LAYOUT_CONFIG.lineHeight + LAYOUT_CONFIG.basePadding + extraPadding,
+		lines * LAYOUT_CONFIG.lineHeight +
+			LAYOUT_CONFIG.basePadding +
+			extraPadding +
+			tallNodePadding,
 		minHeight
 	);
 }
@@ -186,10 +193,12 @@ export function applyBalancedLayout(
 			y: LAYOUT_CONFIG.startY,
 		};
 
-		// Count nodes to determine reasonable tree height
+		// Calculate total height needed by summing all node heights
+		let totalNodeHeight = 0;
 		let nodeCount = 0;
 		let maxHeight = 0;
 		root.each((node) => {
+			totalNodeHeight += node.data.estimatedHeight;
 			nodeCount++;
 			maxHeight = Math.max(maxHeight, node.data.estimatedHeight);
 		});
@@ -211,64 +220,34 @@ export function applyBalancedLayout(
 			}
 		});
 
-		// Increase tree height for more vertical spacing
-		const treeHeight = nodeCount * (maxHeight * 1.1); // Much larger multiplier for generous spacing
+		// Calculate tree height based on total actual node heights plus spacing multiplier
+		// This ensures consistent spacing regardless of collapse/expand state
+		const treeHeight =
+			totalNodeHeight * LAYOUT_CONFIG.verticalSpacingMultiplier;
 
 		const clusterLayout = cluster<HierarchyNode>()
 			.size([treeHeight, 1000])
 			.separation((a, b) => {
-				// Generous vertical spacing
+				// D3's separation returns a RELATIVE multiplier that gets scaled by treeHeight
+				// To get consistent absolute spacing, we need to calculate separation
+				// relative to the average node height in THIS tree
 
-				const aHeight = a.data.estimatedHeight;
-				const bHeight = b.data.estimatedHeight;
-				const avgHeight = (aHeight + bHeight) / 2;
-				const baseHeight = LAYOUT_CONFIG.lineHeight + LAYOUT_CONFIG.basePadding;
+				const heightA = a.data?.estimatedHeight || 44;
+				const heightB = b.data?.estimatedHeight || 44;
+				const maxNodeHeight = Math.max(heightA, heightB);
 
-				// Much larger base spacing
-				const baseHeightFactor = Math.max(0.45, (avgHeight / baseHeight) * 0.5);
+				// Calculate average node height for this tree
+				const avgNodeHeight = totalNodeHeight / nodeCount;
 
-				// If siblings, check parent's density
-				if (a.parent === b.parent && a.parent) {
-					const parentDescendants =
-						descendantCounts.get(a.parent.data.instanceId) || 0;
-					const siblingCount = siblingCounts.get(a.parent.data.instanceId) || 0;
+				// Return separation relative to average node height
+				// This way, when D3 scales by treeHeight, similar structures get similar absolute spacing
+				// The 0.02 is a base minimum, and we add based on actual node height
+				const relativeSeparation = (maxNodeHeight / avgNodeHeight) * 0.02;
 
-					// Check if either sibling is a leaf node (no children)
-					const aIsLeaf = !a.children || a.children.length === 0;
-					const bIsLeaf = !b.children || b.children.length === 0;
-
-					// If parent has many descendants AND many direct children,
-					// we need more vertical spacing to prevent edge overlap
-					if (parentDescendants >= 5 && siblingCount >= 4) {
-						// Dense subtree: increase vertical spacing
-						const densityMultiplier =
-							1.5 + Math.min((siblingCount - 4) * 0.2, 1.0);
-						return baseHeightFactor * densityMultiplier;
-					}
-
-					// If parent has shallow subtree (only one level of children),
-					// increase spacing significantly for better readability
-					if (parentDescendants > 0 && parentDescendants === siblingCount) {
-						return baseHeightFactor * 1.5; // 2.5x spacing for single-level children
-					}
-
-					// If at least one sibling is a leaf node, add more spacing
-					if (aIsLeaf || bIsLeaf) {
-						return baseHeightFactor * 1.4;
-					}
-				}
-
-				// Default generous spacing
-				return a.parent === b.parent
-					? baseHeightFactor // Siblings: generous spacing
-					: baseHeightFactor * 1.2; // Cousins: even more spacing
+				return LAYOUT_CONFIG.minVerticalSeparation + relativeSeparation;
 			});
 
 		const layoutRoot = clusterLayout(root);
-
-		// Use constant horizontal spacing for uniform edge lengths
-		// All nodes at the same depth get the same X position
-		const CONSTANT_HORIZONTAL_SPACING = 240; // Fixed spacing between levels
 
 		// Find the root node's position in the d3 layout to calculate offset
 		let rootLayoutY = 0;
@@ -290,9 +269,9 @@ export function applyBalancedLayout(
 				tempNode = tempNode.parent;
 			}
 
-			// X position = root's X + (depth × constant spacing)
+			// X position = root's X + (depth × horizontal spacing from config)
 			// Y position = d3's calculated Y + offset to maintain root's original position
-			const xPos = rootPos.x + depth * CONSTANT_HORIZONTAL_SPACING;
+			const xPos = rootPos.x + depth * LAYOUT_CONFIG.horizontalSpacing;
 
 			positions.set(node.data.instanceId, {
 				x: xPos,
