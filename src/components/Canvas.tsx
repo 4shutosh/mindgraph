@@ -901,7 +901,8 @@ export default function Canvas({
 						const targetIndex = targetDropOrder;
 						if (targetIndex < otherSiblings.length) {
 							// Highlight the sibling at the target index (the dragged node will be inserted before it)
-							isDragOver = instance.instanceId === otherSiblings[targetIndex].instanceId;
+							isDragOver =
+								instance.instanceId === otherSiblings[targetIndex].instanceId;
 						}
 					}
 				}
@@ -1619,7 +1620,9 @@ export default function Canvas({
 				if (!targetNode) return;
 
 				// Calculate horizontal and vertical distances separately
-				const horizontalDist = Math.abs(targetNode.position.x - node.position.x);
+				const horizontalDist = Math.abs(
+					targetNode.position.x - node.position.x
+				);
 				const verticalDist = Math.abs(targetNode.position.y - node.position.y);
 				const totalDistance = Math.sqrt(
 					Math.pow(horizontalDist, 2) + Math.pow(verticalDist, 2)
@@ -1652,11 +1655,12 @@ export default function Canvas({
 			// 2. Else if significant horizontal movement (not just vertical) -> REPARENT MODE
 			// 3. Else -> REORDER MODE (vertical reordering of siblings)
 			const REPARENT_THRESHOLD = 100;
-			
+
 			// Prefer reorder mode if movement is primarily vertical
 			const isPrimarylyVertical = verticalMovement > horizontalMovement * 2;
-			const hasSignificantHorizontalMovement = horizontalMovement > REPARENT_THRESHOLD;
-			
+			const hasSignificantHorizontalMovement =
+				horizontalMovement > REPARENT_THRESHOLD;
+
 			const isReparentMode =
 				(hoveringOverValidTarget && !isPrimarylyVertical) ||
 				hasSignificantHorizontalMovement;

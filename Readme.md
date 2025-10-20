@@ -57,4 +57,8 @@ npm run build
 - **Vite** for build tooling
 - **localStorage** for persistence
 
+## Documentation
+
+- **[Layout System Guide](LAYOUT_GUIDE.md)** - Comprehensive guide on how the tree layout works and how to tune spacing variables
+
 ---

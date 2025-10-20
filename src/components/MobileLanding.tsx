@@ -1,7 +1,17 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import "./MobileLanding.css";
 
 const MobileLanding: React.FC = () => {
+	const navigate = useNavigate();
+
+	const handleGoToApp = () => {
+		navigate("/");
+	};
+
+	// Check if user is on desktop (screen width >= 768px)
+	const isDesktop = window.innerWidth >= 768;
+
 	return (
 		<div className="mobile-landing">
 			<div className="mobile-content">
@@ -25,13 +35,22 @@ const MobileLanding: React.FC = () => {
 						</p>
 					</div>
 
-					<div className="desktop-notice">
-						<p>
-							This website is optimized for desktop use with keyboard navigation
-							and precise mouse interactions. Please open this website on a
-							desktop or laptop computer to get the full experience.
-						</p>
-					</div>
+					{isDesktop ? (
+						<div className="desktop-cta">
+							<button onClick={handleGoToApp} className="cta-button">
+								Go to App →
+							</button>
+						</div>
+					) : (
+						<div className="desktop-notice">
+							<p>
+								This website is optimized for desktop use with keyboard
+								navigation and precise mouse interactions. Please open this
+								website on a desktop or laptop computer to get the full
+								experience.
+							</p>
+						</div>
+					)}
 				</div>
 			</div>
 		</div>
