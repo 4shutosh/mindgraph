@@ -2,8 +2,14 @@ import { useEffect, useCallback, useState } from "react";
 import Canvas from "../components/Canvas";
 import Header from "../components/Header";
 import ShortcutsModal from "../components/ShortcutsModal";
-import { MindGraph } from "../types";
-import { loadGraph, saveGraph, createEmptyGraph } from "../utils/storage";
+import CanvasManager from "../components/CanvasManager";
+import { MindGraph, AppState, CanvasData } from "../types";
+import {
+	loadAppState,
+	saveAppState,
+	createDefaultAppState,
+	createEmptyCanvas,
+} from "../utils/storage";
 import { useHistory } from "../utils/useHistory";
 import { createNode, createNodeInstance } from "../utils/nodeHelpers";
 import {
@@ -16,28 +22,52 @@ function Home() {
 	const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
 	const [instanceToEdit, setInstanceToEdit] = useState<string | null>(null);
 
-	// Initialize state with history management
+	// Initialize app state with history management
 	const {
-		state: graph,
-		setState: setGraph,
+		state: appState,
+		setState: setAppState,
 		undo,
 		redo,
 		canUndo,
 		canRedo,
-	} = useHistory<MindGraph>(loadGraph() || createEmptyGraph(), {
+	} = useHistory<AppState>(loadAppState() || createDefaultAppState(), {
 		maxHistorySize: 50,
 	});
 
+	// Get the active canvas
+	const activeCanvas = appState.canvases.find(
+		(c) => c.id === appState.activeCanvasId
+	);
+	const graph = activeCanvas?.graph || { nodes: {}, instances: [], edges: [], rootNodeId: null, focusedInstanceId: null };
+
 	// Auto-save to localStorage
 	useEffect(() => {
-		saveGraph(graph);
-	}, [graph]);
+		saveAppState(appState);
+	}, [appState]);
 
 	const handleGraphChange = useCallback(
 		(newGraph: MindGraph) => {
-			setGraph(newGraph, true); // true = save to history
+			if (!activeCanvas) return;
+
+			const updatedCanvas: CanvasData = {
+				...activeCanvas,
+				graph: newGraph,
+				updatedAt: Date.now(),
+			};
+
+			const updatedCanvases = appState.canvases.map((c) =>
+				c.id === activeCanvas.id ? updatedCanvas : c
+			);
+
+			setAppState(
+				{
+					...appState,
+					canvases: updatedCanvases,
+				},
+				true
+			); // true = save to history
 		},
-		[setGraph]
+		[appState, activeCanvas, setAppState]
 	);
 
 	// Create a new node
@@ -136,6 +166,87 @@ function Home() {
 		}
 	}, [graph, handleGraphChange]);
 
+	// Canvas management functions
+	const handleCanvasSelect = useCallback(
+		(canvasId: string) => {
+			setAppState(
+				{
+					...appState,
+					activeCanvasId: canvasId,
+				},
+				false
+			); // false = don't save to history (just navigation)
+		},
+		[appState, setAppState]
+	);
+
+	const handleCanvasCreate = useCallback(() => {
+		const newCanvas = createEmptyCanvas(`Canvas ${appState.canvases.length + 1}`);
+		setAppState(
+			{
+				canvases: [...appState.canvases, newCanvas],
+				activeCanvasId: newCanvas.id,
+			},
+			true
+		); // true = save to history
+	}, [appState, setAppState]);
+
+	const handleCanvasRename = useCallback(
+		(canvasId: string, newName: string) => {
+			const updatedCanvases = appState.canvases.map((c) =>
+				c.id === canvasId
+					? { ...c, name: newName, updatedAt: Date.now() }
+					: c
+			);
+			setAppState(
+				{
+					...appState,
+					canvases: updatedCanvases,
+				},
+				true
+			); // true = save to history
+		},
+		[appState, setAppState]
+	);
+
+	const handleCanvasDelete = useCallback(
+		(canvasId: string) => {
+			const updatedCanvases = appState.canvases.filter((c) => c.id !== canvasId);
+			
+			// If we're deleting the active canvas, switch to another one
+			let newActiveCanvasId = appState.activeCanvasId;
+			if (canvasId === appState.activeCanvasId && updatedCanvases.length > 0) {
+				newActiveCanvasId = updatedCanvases[0].id;
+			}
+
+			setAppState(
+				{
+					canvases: updatedCanvases,
+					activeCanvasId: newActiveCanvasId,
+				},
+				true
+			); // true = save to history
+		},
+		[appState, setAppState]
+	);
+
+	const handleCanvasReorder = useCallback(
+		(fromIndex: number, toIndex: number) => {
+			const updatedCanvases = [...appState.canvases];
+			const [removed] = updatedCanvases.splice(fromIndex, 1);
+			updatedCanvases.splice(toIndex, 0, removed);
+
+			setAppState(
+				{
+					...appState,
+					canvases: updatedCanvases,
+				},
+				true
+			); // true = save to history
+		},
+		[appState, setAppState]
+	);
+
 	// Keyboard shortcuts for undo/redo
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -178,6 +289,16 @@ function Home() {
 				onToggleShortcuts={() => setIsShortcutsModalOpen(true)}
 				onExport={handleExport}
 				onImport={handleImport}
+			/>
+
+			<CanvasManager
+				canvases={appState.canvases}
+				activeCanvasId={appState.activeCanvasId}
+				onCanvasSelect={handleCanvasSelect}
+				onCanvasCreate={handleCanvasCreate}
+				onCanvasRename={handleCanvasRename}
+				onCanvasDelete={handleCanvasDelete}
+				onCanvasReorder={handleCanvasReorder}
 			/>
 
 			<Canvas
