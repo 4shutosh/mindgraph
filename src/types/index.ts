@@ -84,3 +84,34 @@ export interface MindGraph {
 	/** Currently focused instance ID for keyboard navigation */
 	focusedInstanceId: string | null;
 }
+
+/**
+ * Canvas representation - a named workspace containing a graph
+ */
+export interface CanvasData {
+	/** Unique identifier for this canvas */
+	id: string;
+
+	/** User-defined name for the canvas */
+	name: string;
+
+	/** The graph data for this canvas */
+	graph: MindGraph;
+
+	/** Timestamp of creation */
+	createdAt: number;
+
+	/** Timestamp of last update */
+	updatedAt: number;
+}
+
+/**
+ * Application state with multiple canvases
+ */
+export interface AppState {
+	/** All canvases */
+	canvases: CanvasData[];
+
+	/** ID of the currently active canvas */
+	activeCanvasId: string | null;
+}

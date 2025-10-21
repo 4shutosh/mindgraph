@@ -92,6 +92,24 @@
 	background: #dc2626;
 }
 
+.confirm-dialog-button-info {
+	background: #007bff;
+	color: white;
+}
+
+.confirm-dialog-button-info:hover {
+	background: #0056b3;
+}
+
+.confirm-dialog-button-third {
+	background: #10b981;
+	color: white;
+}
+
+.confirm-dialog-button-third:hover {
+	background: #059669;
+}
+
 .confirm-dialog-button:active {
 	transform: scale(0.98);
 }

@@ -8,6 +8,12 @@ interface ConfirmDialogProps {
 	onCancel: () => void;
 	confirmText?: string;
 	cancelText?: string;
+	/** Optional third action button */
+	thirdAction?: {
+		text: string;
+		onClick: () => void;
+		className?: string;
+	};
 }
 
 /**
@@ -21,6 +27,7 @@ export default function ConfirmDialog({
 	onCancel,
 	confirmText = "OK",
 	cancelText = "Cancel",
+	thirdAction,
 }: ConfirmDialogProps) {
 	if (!isOpen) return null;
 
@@ -30,14 +37,24 @@ export default function ConfirmDialog({
 				<h2 className="confirm-dialog-title">{title}</h2>
 				<p className="confirm-dialog-message">{message}</p>
 				<div className="confirm-dialog-buttons">
+					{cancelText && (
+						<button
+							className="confirm-dialog-button confirm-dialog-button-cancel"
+							onClick={onCancel}
+						>
+							{cancelText}
+						</button>
+					)}
+					{thirdAction && (
+						<button
+							className={`confirm-dialog-button ${thirdAction.className || "confirm-dialog-button-third"}`}
+							onClick={thirdAction.onClick}
+						>
+							{thirdAction.text}
+						</button>
+					)}
 					<button
-						className="confirm-dialog-button confirm-dialog-button-cancel"
-						onClick={onCancel}
-					>
-						{cancelText}
-					</button>
-					<button
-						className="confirm-dialog-button confirm-dialog-button-confirm"
+						className={`confirm-dialog-button ${!cancelText && !thirdAction ? "confirm-dialog-button-info" : "confirm-dialog-button-confirm"}`}
 						onClick={onConfirm}
 					>
 						{confirmText}
