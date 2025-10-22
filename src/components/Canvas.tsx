@@ -40,6 +40,11 @@ const nodeTypes: NodeTypes = {
 // Maximum number of hyperlink suggestions to show
 const MAX_HYPERLINK_SUGGESTIONS = 10;
 
+// Node dimensions and viewport padding constants
+const NODE_WIDTH = 150;
+const NODE_HEIGHT = 40;
+const VIEWPORT_PADDING = 100;
+
 interface CanvasProps {
 	graph: MindGraph;
 	onGraphChange: (graph: MindGraph) => void;
@@ -78,6 +83,9 @@ export default function Canvas({
 		Node<MindNodeData>,
 		Edge
 	> | null>(null);
+	
+	// Cache React Flow container ref for viewport calculations (performance optimization)
+	const containerRef = useRef<HTMLElement | null>(null);
 
 	// Hyperlinking state
 	const [isHyperlinkMode, setIsHyperlinkMode] = useState(false);
@@ -126,6 +134,14 @@ export default function Canvas({
 			setEditingInstanceId(instanceToEditId);
 		}
 	}, [instanceToEditId]);
+
+	// Cache React Flow container reference for viewport calculations (performance optimization)
+	// This prevents expensive DOM queries on every keyboard navigation
+	useEffect(() => {
+		const reactFlowWrapper = document.querySelector('.react-flow__renderer');
+		containerRef.current = (reactFlowWrapper as HTMLElement) || 
+		                       (document.querySelector('.react-flow') as HTMLElement);
+	}, []);
 
 	// Rebuild the search trie whenever nodes change
 	useEffect(() => {
@@ -1222,6 +1238,61 @@ export default function Canvas({
 		[]
 	);
 
+	// Helper: Check if a node is visible in the current viewport
+	// Uses cached container ref to avoid expensive DOM queries on every navigation
+	const isNodeInViewport = useCallback((nodeId: string): boolean => {
+		if (!reactFlowInstance.current || !containerRef.current) return true;
+
+		const node = reactFlowInstance.current.getNode(nodeId);
+		if (!node) return true;
+
+		// Use cached container ref instead of DOM query (performance optimization)
+		const containerRect = containerRef.current.getBoundingClientRect();
+		
+		// Get viewport transformation
+		const viewport = reactFlowInstance.current.getViewport();
+		const { x: viewportX, y: viewportY, zoom } = viewport;
+
+		// Transform node position to screen coordinates
+		const nodeScreenX = node.position.x * zoom + viewportX;
+		const nodeScreenY = node.position.y * zoom + viewportY;
+
+		// Calculate node size in screen coordinates using constants
+		const nodeWidth = NODE_WIDTH * zoom;
+		const nodeHeight = NODE_HEIGHT * zoom;
+
+		// Check if node is within viewport bounds with padding (both horizontally AND vertically)
+		const isVisibleHorizontally = 
+			nodeScreenX + nodeWidth > VIEWPORT_PADDING &&
+			nodeScreenX < containerRect.width - VIEWPORT_PADDING;
+		
+		const isVisibleVertically = 
+			nodeScreenY + nodeHeight > VIEWPORT_PADDING &&
+			nodeScreenY < containerRect.height - VIEWPORT_PADDING;
+
+		return isVisibleHorizontally && isVisibleVertically;
+	}, []);
+
+	// Helper: Pan to a node if it's outside the viewport
+	const panToNodeIfNeeded = useCallback((nodeId: string) => {
+		if (!reactFlowInstance.current) return;
+
+		const isVisible = isNodeInViewport(nodeId);
+		
+		// Only pan if the node is outside the viewport
+		if (!isVisible) {
+			const node = reactFlowInstance.current.getNode(nodeId);
+			if (node) {
+				const zoom = reactFlowInstance.current.getZoom();
+				reactFlowInstance.current.setCenter(
+					node.position.x + 75, // offset to center of node (approximate)
+					node.position.y + 20,
+					{ zoom, duration: 300 }
+				);
+			}
+		}
+	}, [isNodeInViewport]);
+
 	// Arrow key navigation handlers - only move if valid target exists
 	const handleNavigateLeft = useCallback(() => {
 		if (!graph.focusedInstanceId) return;
@@ -1236,8 +1307,10 @@ export default function Canvas({
 				...graph,
 				focusedInstanceId: parentInstance.instanceId,
 			});
+			// Pan to the node only if it's outside the viewport
+			panToNodeIfNeeded(parentInstance.instanceId);
 		}
-	}, [graph, onGraphChange]);
+	}, [graph, onGraphChange, panToNodeIfNeeded]);
 
 	const handleNavigateRight = useCallback(() => {
 		if (!graph.focusedInstanceId) return;
@@ -1252,8 +1325,10 @@ export default function Canvas({
 				...graph,
 				focusedInstanceId: firstChild.instanceId,
 			});
+			// Pan to the node only if it's outside the viewport
+			panToNodeIfNeeded(firstChild.instanceId);
 		}
-	}, [graph, onGraphChange]);
+	}, [graph, onGraphChange, panToNodeIfNeeded]);
 
 	const handleNavigateDown = useCallback(() => {
 		if (!graph.focusedInstanceId) return;
@@ -1268,8 +1343,10 @@ export default function Canvas({
 				...graph,
 				focusedInstanceId: nextSibling.instanceId,
 			});
+			// Pan to the node only if it's outside the viewport
+			panToNodeIfNeeded(nextSibling.instanceId);
 		}
-	}, [graph, onGraphChange]);
+	}, [graph, onGraphChange, panToNodeIfNeeded]);
 
 	const handleNavigateUp = useCallback(() => {
 		if (!graph.focusedInstanceId) return;
@@ -1284,8 +1361,10 @@ export default function Canvas({
 				...graph,
 				focusedInstanceId: previousSibling.instanceId,
 			});
+			// Pan to the node only if it's outside the viewport
+			panToNodeIfNeeded(previousSibling.instanceId);
 		}
-	}, [graph, onGraphChange]);
+	}, [graph, onGraphChange, panToNodeIfNeeded]);
 
 	// Helper: Perform the actual deletion after confirmation
 	const performDeletion = useCallback(
