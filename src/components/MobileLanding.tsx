@@ -6,7 +6,7 @@ const MobileLanding: React.FC = () => {
 	const navigate = useNavigate();
 
 	const handleGoToApp = () => {
-		navigate("/");
+		navigate("/canvas");
 	};
 
 	// Check if user is on desktop (screen width >= 768px)

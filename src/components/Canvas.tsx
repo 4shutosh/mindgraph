@@ -83,7 +83,7 @@ export default function Canvas({
 		Node<MindNodeData>,
 		Edge
 	> | null>(null);
-	
+
 	// Cache React Flow container ref for viewport calculations (performance optimization)
 	const containerRef = useRef<HTMLElement | null>(null);
 
@@ -138,9 +138,10 @@ export default function Canvas({
 	// Cache React Flow container reference for viewport calculations (performance optimization)
 	// This prevents expensive DOM queries on every keyboard navigation
 	useEffect(() => {
-		const reactFlowWrapper = document.querySelector('.react-flow__renderer');
-		containerRef.current = (reactFlowWrapper as HTMLElement) || 
-		                       (document.querySelector('.react-flow') as HTMLElement);
+		const reactFlowWrapper = document.querySelector(".react-flow__renderer");
+		containerRef.current =
+			(reactFlowWrapper as HTMLElement) ||
+			(document.querySelector(".react-flow") as HTMLElement);
 	}, []);
 
 	// Rebuild the search trie whenever nodes change
@@ -1248,7 +1249,7 @@ export default function Canvas({
 
 		// Use cached container ref instead of DOM query (performance optimization)
 		const containerRect = containerRef.current.getBoundingClientRect();
-		
+
 		// Get viewport transformation
 		const viewport = reactFlowInstance.current.getViewport();
 		const { x: viewportX, y: viewportY, zoom } = viewport;
@@ -1262,11 +1263,11 @@ export default function Canvas({
 		const nodeHeight = NODE_HEIGHT * zoom;
 
 		// Check if node is within viewport bounds with padding (both horizontally AND vertically)
-		const isVisibleHorizontally = 
+		const isVisibleHorizontally =
 			nodeScreenX + nodeWidth > VIEWPORT_PADDING &&
 			nodeScreenX < containerRect.width - VIEWPORT_PADDING;
-		
-		const isVisibleVertically = 
+
+		const isVisibleVertically =
 			nodeScreenY + nodeHeight > VIEWPORT_PADDING &&
 			nodeScreenY < containerRect.height - VIEWPORT_PADDING;
 
@@ -1274,24 +1275,27 @@ export default function Canvas({
 	}, []);
 
 	// Helper: Pan to a node if it's outside the viewport
-	const panToNodeIfNeeded = useCallback((nodeId: string) => {
-		if (!reactFlowInstance.current) return;
+	const panToNodeIfNeeded = useCallback(
+		(nodeId: string) => {
+			if (!reactFlowInstance.current) return;
 
-		const isVisible = isNodeInViewport(nodeId);
-		
-		// Only pan if the node is outside the viewport
-		if (!isVisible) {
-			const node = reactFlowInstance.current.getNode(nodeId);
-			if (node) {
-				const zoom = reactFlowInstance.current.getZoom();
-				reactFlowInstance.current.setCenter(
-					node.position.x + 75, // offset to center of node (approximate)
-					node.position.y + 20,
-					{ zoom, duration: 300 }
-				);
+			const isVisible = isNodeInViewport(nodeId);
+
+			// Only pan if the node is outside the viewport
+			if (!isVisible) {
+				const node = reactFlowInstance.current.getNode(nodeId);
+				if (node) {
+					const zoom = reactFlowInstance.current.getZoom();
+					reactFlowInstance.current.setCenter(
+						node.position.x + 75, // offset to center of node (approximate)
+						node.position.y + 20,
+						{ zoom, duration: 300 }
+					);
+				}
 			}
-		}
-	}, [isNodeInViewport]);
+		},
+		[isNodeInViewport]
+	);
 
 	// Arrow key navigation handlers - only move if valid target exists
 	const handleNavigateLeft = useCallback(() => {

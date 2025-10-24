@@ -13,18 +13,18 @@ function App() {
 	return (
 		<Router>
 			<Routes>
-				{/* Desktop-only home route - redirects mobile users to /landing */}
+				{/* Landing page on home route - SEO optimized, accessible to all */}
+				<Route path="/" element={<Landing />} />
+
+				{/* Desktop-only canvas route for the app */}
 				<Route
-					path="/"
+					path="/canvas"
 					element={
 						<DesktopOnlyRoute>
 							<Home />
 						</DesktopOnlyRoute>
 					}
 				/>
-
-				{/* Mobile landing page */}
-				<Route path="/landing" element={<Landing />} />
 
 				{/* Catch all - redirect to home */}
 				<Route path="*" element={<Navigate to="/" replace />} />
