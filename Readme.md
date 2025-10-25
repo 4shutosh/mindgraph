@@ -4,23 +4,40 @@ I was building a knowledge based decision tree, where a set of decisions kept re
 
 Here is my attempt to solve that usecase. This will be a keyboard first mindgraph - a mindmap where you can hyperlink nodes - so a graph :)
 
-![thinkitout-demo](public/demo.png)
+![thinkitout-demo](apps/client/public/demo.png)
+
+## Monorepo Structure
+
+This project is organized as a monorepo:
+
+```
+mindgraph/
+├── apps/
+│   ├── client/          # React + TypeScript frontend (Vite)
+│   └── server/          # FastAPI + PostgreSQL backend (coming soon)
+├── packages/
+│   └── types/           # Shared types (optional)
+└── docker/              # Docker configuration
+```
 
 ### Installation
 
 ```bash
+cd apps/client
 npm install
 ```
 
 ### Development
 
 ```bash
+cd apps/client
 npm run dev
 ```
 
 ### Build
 
 ```bash
+cd apps/client
 npm run build
 ```
 
