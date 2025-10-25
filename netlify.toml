@@ -1,0 +1,15 @@
+[build]
+  # Base directory is where your frontend app lives
+  base = "apps/client"
+  
+  # Build command to run
+  command = "npm run build"
+  
+  # Directory to publish (relative to base)
+  publish = "dist"
+
+# Redirect rules for SPA routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
