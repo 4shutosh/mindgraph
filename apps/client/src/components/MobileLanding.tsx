@@ -31,7 +31,7 @@ const MobileLanding: React.FC = () => {
 					<p className="hero-description">
 						You're building a decision tree and realize this exact pattern already exists 
 						somewhere else in your map. Traditional mindmaps force you to duplicate the 
-						entire subtree. ThinkItOut lets you link to it once and reuse it everywhere.
+						entire subtree, or compromise on structure. ThinkItOut lets you link to it once and reuse it everywhere.
 					</p>
 					{isDesktop && (
 						<button onClick={handleGoToApp} className="cta-primary">
