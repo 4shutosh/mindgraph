@@ -6,6 +6,7 @@ interface HeaderProps {
 	onToggleShortcuts: () => void;
 	onExport: () => void;
 	onImport: () => void;
+	onCopyAsImage?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -13,6 +14,7 @@ const Header: React.FC<HeaderProps> = ({
 	onToggleShortcuts,
 	onExport,
 	onImport,
+	onCopyAsImage,
 }) => {
 	const navigate = useNavigate();
 
@@ -52,6 +54,15 @@ const Header: React.FC<HeaderProps> = ({
 					>
 						Export
 					</button>
+					{onCopyAsImage && (
+						<button
+							className="btn btn-secondary"
+							onClick={onCopyAsImage}
+							title="Download tree as PNG image"
+						>
+							Download as Image
+						</button>
+					)}
 				</div>
 				{/* <div className="button-group history-buttons">
 					<button

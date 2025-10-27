@@ -17,6 +17,7 @@ import {
 	importGraphFromFile,
 	mergeGraphs,
 } from "../utils/importExport";
+import { downloadTreeAsImage } from "../utils/imageExport";
 
 function Home() {
 	const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
@@ -38,7 +39,13 @@ function Home() {
 	const activeCanvas = appState.canvases.find(
 		(c) => c.id === appState.activeCanvasId
 	);
-	const graph = activeCanvas?.graph || { nodes: {}, instances: [], edges: [], rootNodeId: null, focusedInstanceId: null };
+	const graph = activeCanvas?.graph || {
+		nodes: {},
+		instances: [],
+		edges: [],
+		rootNodeId: null,
+		focusedInstanceId: null,
+	};
 
 	// Auto-save to localStorage
 	useEffect(() => {
@@ -166,6 +173,26 @@ function Home() {
 		}
 	}, [graph, handleGraphChange]);
 
+	// Handle download as image
+	const handleCopyAsImage = useCallback(async () => {
+		try {
+			// Get canvas name, default to "MindGraph" if no active canvas
+			const canvasName = activeCanvas?.name || "MindGraph";
+			// Sanitize filename: remove invalid characters
+			const filename = canvasName
+				.replace(/[^a-z0-9\s-]/gi, "")
+				.trim()
+				.replace(/\s+/g, "-");
+
+			await downloadTreeAsImage(filename, { backgroundColor: "#FFFFFF" });
+			console.log(`Image downloaded as ${filename}.png`);
+			alert(`✅ Image downloaded as ${filename}.png!`);
+		} catch (error) {
+			console.error("Failed to download image:", error);
+			alert("❌ Failed to download image. Check console for details.");
+		}
+	}, [activeCanvas]);
+
 	// Canvas management functions
 	const handleCanvasSelect = useCallback(
 		(canvasId: string) => {
@@ -181,7 +208,9 @@ function Home() {
 	);
 
 	const handleCanvasCreate = useCallback(() => {
-		const newCanvas = createEmptyCanvas(`Canvas ${appState.canvases.length + 1}`);
+		const newCanvas = createEmptyCanvas(
+			`Canvas ${appState.canvases.length + 1}`
+		);
 		setAppState(
 			{
 				canvases: [...appState.canvases, newCanvas],
@@ -194,9 +223,7 @@ function Home() {
 	const handleCanvasRename = useCallback(
 		(canvasId: string, newName: string) => {
 			const updatedCanvases = appState.canvases.map((c) =>
-				c.id === canvasId
-					? { ...c, name: newName, updatedAt: Date.now() }
-					: c
+				c.id === canvasId ? { ...c, name: newName, updatedAt: Date.now() } : c
 			);
 			setAppState(
 				{
@@ -211,8 +238,10 @@ function Home() {
 
 	const handleCanvasDelete = useCallback(
 		(canvasId: string) => {
-			const updatedCanvases = appState.canvases.filter((c) => c.id !== canvasId);
-			
+			const updatedCanvases = appState.canvases.filter(
+				(c) => c.id !== canvasId
+			);
+
 			// If we're deleting the active canvas, switch to another one
 			let newActiveCanvasId = appState.activeCanvasId;
 			if (canvasId === appState.activeCanvasId && updatedCanvases.length > 0) {
@@ -289,6 +318,7 @@ function Home() {
 				onToggleShortcuts={() => setIsShortcutsModalOpen(true)}
 				onExport={handleExport}
 				onImport={handleImport}
+				onCopyAsImage={handleCopyAsImage}
 			/>
 
 			<CanvasManager
