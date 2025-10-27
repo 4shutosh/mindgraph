@@ -186,7 +186,7 @@ function Home() {
 
 			await downloadTreeAsImage(filename, { backgroundColor: "#FFFFFF" });
 			console.log(`Image downloaded as ${filename}.png`);
-			alert(`✅ Image downloaded as ${filename}.png!`);
+			// alert(`✅ Image downloaded as ${filename}.png!`);
 		} catch (error) {
 			console.error("Failed to download image:", error);
 			alert("❌ Failed to download image. Check console for details.");
