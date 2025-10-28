@@ -60,7 +60,7 @@ const Header: React.FC<HeaderProps> = ({
 							onClick={onCopyAsImage}
 							title="Download tree as PNG image"
 						>
-							Download as Image
+							Download Image
 						</button>
 					)}
 				</div>
