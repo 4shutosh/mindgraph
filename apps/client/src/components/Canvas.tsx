@@ -2105,7 +2105,7 @@ export default function Canvas({
 			tabIndex={0}
 		>
 			<Background variant={BackgroundVariant.Dots} />
-			<Controls />
+			<Controls showInteractive={false} />
 			{/* <MiniMap /> */}
 
 			{/* Hyperlink search dropdown */}
