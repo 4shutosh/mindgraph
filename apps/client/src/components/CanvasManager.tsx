@@ -57,13 +57,34 @@ export default function CanvasManager({
 			setShowLastCanvasWarning(true);
 			return;
 		}
-		
+
 		// If canvas is empty, delete immediately without confirmation
 		if (canvas.graph.instances.length === 0) {
 			onCanvasDelete(canvas.id);
 			return;
 		}
-		
+
+		// Check if canvas only has the default "Start Here" node
+		// Conditions: exactly 1 instance, no edges (no children), and the node is "Start Here"
+		if (
+			canvas.graph.instances.length === 1 &&
+			canvas.graph.edges.length === 0 &&
+			canvas.graph.rootNodeId !== null
+		) {
+			const rootInstance = canvas.graph.instances.find(
+				(inst) => inst.parentInstanceId === null
+			);
+			if (rootInstance) {
+				const rootNode = canvas.graph.nodes[rootInstance.nodeId];
+				// Check if it has the default "Start Here" title
+				if (rootNode && rootNode.title === "Start Here") {
+					// Delete immediately without confirmation
+					onCanvasDelete(canvas.id);
+					return;
+				}
+			}
+		}
+
 		// Otherwise, show confirmation dialog
 		setCanvasToDelete(canvas);
 		setDeleteDialogOpen(true);
@@ -107,7 +128,11 @@ export default function CanvasManager({
 	};
 
 	const handleDragEnd = () => {
-		if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
+		if (
+			draggedIndex !== null &&
+			dragOverIndex !== null &&
+			draggedIndex !== dragOverIndex
+		) {
 			onCanvasReorder(draggedIndex, dragOverIndex);
 		}
 		setDraggedIndex(null);
@@ -157,7 +182,13 @@ export default function CanvasManager({
 					</button>
 				</div>
 
-				<button className="canvas-create-btn" onClick={onCanvasCreate}>
+				<button
+					className="canvas-create-btn"
+					onClick={() => {
+						onCanvasCreate();
+						setIsOpen(false);
+					}}
+				>
 					<span className="plus-icon">+</span> New Canvas
 				</button>
 
@@ -176,19 +207,23 @@ export default function CanvasManager({
 							onDragEnd={handleDragEnd}
 							onDragLeave={handleDragLeave}
 						>
-							<div className="canvas-item-content">
+							<div
+								className="canvas-item-content"
+								onClick={() => {
+									if (editingCanvasId !== canvas.id) {
+										onCanvasSelect(canvas.id);
+										// Close the side menu when selecting a different canvas
+										if (canvas.id !== activeCanvasId) {
+											setIsOpen(false);
+										}
+									}
+								}}
+							>
 								<span className="drag-handle" title="Drag to reorder">
 									⋮⋮
 								</span>
 
-								<div
-									className="canvas-name-wrapper"
-									onClick={() => {
-										if (editingCanvasId !== canvas.id) {
-											onCanvasSelect(canvas.id);
-										}
-									}}
-								>
+								<div className="canvas-name-wrapper">
 									{editingCanvasId === canvas.id ? (
 										<input
 											ref={editInputRef}
@@ -250,7 +285,12 @@ export default function CanvasManager({
 			</div>
 
 			{/* Overlay */}
-			{isOpen && <div className="canvas-manager-overlay" onClick={() => setIsOpen(false)} />}
+			{isOpen && (
+				<div
+					className="canvas-manager-overlay"
+					onClick={() => setIsOpen(false)}
+				/>
+			)}
 
 			{/* Last Canvas Warning Dialog */}
 			<ConfirmDialog
@@ -275,7 +315,11 @@ export default function CanvasManager({
 					}
 					onConfirm={handleDeleteConfirm}
 					onCancel={handleDeleteCancel}
-					confirmText={canvasToDelete.graph.instances.length > 0 ? "Delete Without Export" : "Delete"}
+					confirmText={
+						canvasToDelete.graph.instances.length > 0
+							? "Delete Without Export"
+							: "Delete"
+					}
 					cancelText="Cancel"
 					thirdAction={
 						canvasToDelete.graph.instances.length > 0

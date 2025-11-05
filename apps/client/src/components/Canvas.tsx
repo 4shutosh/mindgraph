@@ -1049,6 +1049,36 @@ export default function Canvas({
 		syncGraphToFlow();
 	}, [syncGraphToFlow]);
 
+	// Fit view when graph changes significantly (e.g., when switching canvases)
+	// Track rootNodeId to detect canvas switches - this is more stable than tracking instances.length
+	// which changes frequently during normal editing
+	const prevRootNodeIdRef = useRef<string | null>(graph.rootNodeId);
+	useEffect(() => {
+		// Only fit view if rootNodeId changed (indicates canvas switch) or if graph was empty and now has nodes
+		const rootNodeIdChanged = prevRootNodeIdRef.current !== graph.rootNodeId;
+		const wasEmptyNowHasNodes =
+			prevRootNodeIdRef.current === null &&
+			graph.rootNodeId !== null &&
+			graph.instances.length > 0;
+
+		if (rootNodeIdChanged || wasEmptyNowHasNodes) {
+			prevRootNodeIdRef.current = graph.rootNodeId;
+
+			// Wait for React Flow to update nodes/edges before fitting view
+			if (reactFlowInstance.current && graph.instances.length > 0) {
+				const timeoutId = setTimeout(() => {
+					if (reactFlowInstance.current) {
+						reactFlowInstance.current.fitView({ duration: 300, padding: 0.1 });
+					}
+				}, 100);
+				return () => clearTimeout(timeoutId);
+			}
+		} else {
+			// Update ref even if we don't fit view
+			prevRootNodeIdRef.current = graph.rootNodeId;
+		}
+	}, [graph.rootNodeId, graph.instances.length]);
+
 	// Pan to newly created/editing nodes
 	useEffect(() => {
 		if (editingInstanceId && reactFlowInstance.current) {

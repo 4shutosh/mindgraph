@@ -1,4 +1,6 @@
 import { MindGraph, AppState, CanvasData } from "../types";
+import { createNode, createNodeInstance } from "./nodeHelpers";
+import { recalculateLayout } from "./layoutHelpers";
 
 const STORAGE_KEY = "mindgraph-data";
 const APP_STATE_KEY = "mindgraph-app-state";
@@ -13,7 +15,9 @@ function generateId(): string {
 /**
  * Create an empty canvas with a default name
  */
-export function createEmptyCanvas(name: string = "Untitled Canvas"): CanvasData {
+export function createEmptyCanvas(
+	name: string = "Untitled Canvas"
+): CanvasData {
 	const now = Date.now();
 	return {
 		id: generateId(),
@@ -120,14 +124,36 @@ export function loadGraph(): MindGraph | null {
 }
 
 /**
- * Create an empty graph
+ * Create an empty graph with a default root node "Start Here"
  */
 export function createEmptyGraph(): MindGraph {
+	// Create the default root node
+	const rootNode = createNode("Start Here");
+
+	// Create the root node instance (centered position, will be recalculated)
+	const rootInstance = createNodeInstance(
+		rootNode.nodeId,
+		{ x: 0, y: 0 }, // Temporary position
+		null, // No parent (root node)
+		0, // Depth 0
+		0 // Sibling order 0
+	);
+
+	// Recalculate layout to get proper position
+	const layoutedInstances = recalculateLayout([rootInstance], {
+		[rootNode.nodeId]: rootNode,
+	});
+
+	// Get the layouted root instance (should be the first one)
+	const layoutedRootInstance = layoutedInstances[0];
+
 	return {
-		nodes: {},
-		instances: [],
+		nodes: {
+			[rootNode.nodeId]: rootNode,
+		},
+		instances: layoutedInstances,
 		edges: [],
-		rootNodeId: null,
-		focusedInstanceId: null,
+		rootNodeId: rootNode.nodeId,
+		focusedInstanceId: layoutedRootInstance.instanceId,
 	};
 }
