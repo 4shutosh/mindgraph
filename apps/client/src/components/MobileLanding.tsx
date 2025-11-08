@@ -166,7 +166,7 @@ const MobileLanding: React.FC = () => {
 							</a>
 							<div className="footer-links">
 								<a
-									href="mailto:your.email@example.com"
+									href="mailto:4shutoshsingh@gmail.com"
 									className="footer-link"
 									aria-label="Email"
 								>
@@ -185,7 +185,7 @@ const MobileLanding: React.FC = () => {
 									</svg>
 								</a>
 								<a
-									href="https://github.com/yourusername/mindgraph"
+									href="https://github.com/4shutosh/mindgraph"
 									target="_blank"
 									rel="noopener noreferrer"
 									className="footer-link"
